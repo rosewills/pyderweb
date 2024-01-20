@@ -18,6 +18,7 @@ with dis in miles, 1 column/dest with eta in minutes)
 '''
 
 import csv
+import math
 from time import sleep
 from geopy.geocoders import Nominatim
 from geopy.exc import GeocoderTimedOut
@@ -29,6 +30,8 @@ import folium
 import json
 
 client = openrouteservice.Client(key='INSERT_OPENROUTESERVICE_API_KEY_HERE')
+testcoors = ((80.21787585263182,6.025423265401452),(80.23990263756545,6.018498276842677))
+testres = client.directions(testcoors)
 
 
 def get_geocode(address, name, attempt=1, maxAttempts=5):
@@ -73,37 +76,119 @@ destList = [ ("7051 Friendship Rd, Baltimore", "BWI Departures"),
 			("2450 S Milledge Ave, Athens", "Brother's House"),
 			("85554 Blue Rdg Pkwy, Bedford", "Family") ]
 
-startPlace,startName = ("3620 Walnut Street, Philadelphia", "University of Pennsylvania")
-endPlace,endName = ("698 N Atlantic Ave, Ocean City", "Boyfriend")
+homeShort = [ ("1200 N Dupont Hwy, Dover", "Delaware State University"),
+			("3620 Walnut Street, Philadelphia", "University of Pennsylvania"),
+			("620 W Lexington St, College Park", "University of Maryland") ]
 
-startLoc = get_geocode(startPlace, startName)
-endLoc = get_geocode(endPlace, endName)
-startCoors = (startLoc.latitude, startLoc.longitude)
-endCoors = (endLoc.latitude, endLoc.longitude)
-startCoorsFlip = (startLoc.longitude, startLoc.latitude)
-endCoorsFlip = (endLoc.longitude, endLoc.latitude)
-print(startName+":",startLoc.latitude, startLoc.longitude)
-print(endName+":",endLoc.latitude, endLoc.longitude)
+umd = [ ("620 W Lexington St, College Park", "University of Maryland") ]
+upa = [ ("3620 Walnut Street, Philadelphia", "University of Pennsylvania") ]
 
-coors = (startCoorsFlip, endCoorsFlip)
-res = client.directions(coors)
+destShort = [ ("698 N Atlantic Ave, Ocean City", "Boyfriend"),
+			("2450 S Milledge Ave, Athens", "Brother's House"),
+			("85554 Blue Rdg Pkwy, Bedford", "Family") ]
 
-with(open('test-rw2.json','+w')) as f:
-	f.write(json.dumps(res,indent=4, sort_keys=True))
+hPlace,hName = ("3620 Walnut Street, Philadelphia", "University of Pennsylvania")
+dPlace,dName = ("698 N Atlantic Ave, Ocean City", "Boyfriend")
 
-testcoors = ((80.21787585263182,6.025423265401452),(80.23990263756545,6.018498276842677))
-testres = client.directions(testcoors)
+def get_route(startPlace, startName, endPlace, endName):
+	startLoc = get_geocode(startPlace, startName)
+	endLoc = get_geocode(endPlace, endName)
 
-with(open('test-ex2.json','+w')) as f:
-	f.write(json.dumps(testres,indent=4, sort_keys=True))
+	startCoor = (startLoc.latitude, startLoc.longitude)
+	endCoor = (endLoc.latitude, endLoc.longitude)
+	startCoorFlip = (startLoc.longitude, startLoc.latitude)
+	endCoorFlip = (endLoc.longitude, endLoc.latitude)
+
+	# print(startName+":",startLoc.latitude, startLoc.longitude)
+	# print(endName+":",endLoc.latitude, endLoc.longitude)
+
+	print(startName, "----->", endName, startCoor, "----->", endCoor)
+
+	coors = (startCoorFlip, endCoorFlip)
+	res = client.directions(coors)
+	geometry = client.directions(coors)['routes'][0]['geometry']
+	decoded = convert.decode_polyline(geometry)
+
+	with(open('test-rw3.json','+w')) as f:
+		f.write(json.dumps(res,indent=4, sort_keys=True))
+
+	distance = round(res['routes'][0]['summary']['distance']/1609.34,1)
+	duration = round(res['routes'][0]['summary']['duration']/60,1)
+	hours = math.floor(duration / 60)
+	mins = round(duration % 60)
+
+	if hours > 0 and mins > 0:
+		humanTime = str(hours)+"hr "+str(mins)+"min"
+	elif hours > 0:
+		humanTime = str(hours)+"hr"
+	elif mins > 0:
+		humanTime = str(mins)+"min"
+	else:
+		humanTime = "(n/a)"
+
+	print(distance, "miles", "("+humanTime+")")
+
+
+# for homePlace,homeName in umd:
+# 	for destPlace,destName in destShort:
+# 		# print(homePlace, homeName, "----->", destPlace, destName)
+# 		get_route(homePlace, homeName, destPlace, destName)
+
+for homePlace,homeName in upa:
+	gcode = get_geocode(homePlace,homeName)
+	print("success")
+	print(gcode.latitude)
+
+for homePlace,homeName in umd:
+	gcode = get_geocode(homePlace,homeName)
+	print("success")
+	print(gcode.latitude)
+
+
+
+# humanTime = str(math.floor(duration / 60)+"hrs, "+str(duration % 60)+"mins")
+
+# print("Distance:", distance, "miles,", humanTime)
+
+
+# # Generate Map
+# distance_txt = "<h4> <b>Distance :&nbsp" + "<strong>"+str(distance)+" Km </strong>" +"</h4></b>"
+# duration_txt = "<h4> <b>Duration :&nbsp" + "<strong>"+str(duration)+" Mins. </strong>" +"</h4></b>"
+
+# m = folium.Map(location=startCoor,zoom_start=5, control_scale=True,tiles="cartodbpositron")
+
+# folium.GeoJson(decoded).add_child(folium.Popup(distance_txt+duration_txt,max_width=300)).add_to(m)
+
+# folium.Marker(
+# 	location=list(coors[0][::-1]),
+# 	popup="Home",
+# 	icon=folium.Icon(color="green"),
+# ).add_to(m)
+
+# folium.Marker(
+# 	location=list(coors[1][::-1]),
+# 	popup="Dest",
+# 	icon=folium.Icon(color="red"),
+# ).add_to(m)
+
+
+# m.save('map-rw.html')
+
+
+
+
+
 
 # coors = ((39.95285175,-75.19578558111155),(38.61995497051513,-75.10309938399392))
 # res = client.directions(coors)
 
 
+# with(open('test-ex3.json','+w')) as f:
+# 	f.write(json.dumps(testres,indent=4, sort_keys=True))
 
-# for loc,name  in homeList:
-# 	get_geocode(loc, name)
+
+
+
 
 
 
