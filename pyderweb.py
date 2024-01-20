@@ -41,7 +41,7 @@ def do_geocode(address, name, attempt=1, maxAttempts=5):
 	except AttributeError as e:
 		print("Error for", address, e)
 
-homeList = [ ("University of Georgia Chapel", "University of Georgia"),
+homeList = [ ("101 Sanford Dr, Athens", "University of Georgia"),
 			("1200 N Dupont Hwy, Dover", "Delaware State University"),
 			("3620 Walnut Street, Philadelphia", "University of Pennsylvania"),
 			("620 W Lexington St, College Park", "University of Maryland"),
@@ -66,14 +66,10 @@ destList = [ ("7051 Friendship Rd, Baltimore", "BWI Departures"),
 			("2450 S Milledge Ave, Athens", "Brother's House"),
 			("85554 Blue Rdg Pkwy, Bedford", "Family") ]
 
-timeList = [ ("3620 Walnut Street, Philadelphia", "University of Pennsylvania"),
-			("8000 York Rd, Towson", "Towson University"),
-			("4701 N Charles St, Baltimore", "Notre Dame of Maryland University"),
-			("2500 W North Ave, Baltimore", "Coppin State University"),
-			("11301 Springfield Rd, Laurel", "Capitol Technology University") ]
+startLoc = ("3620 Walnut Street, Philadelphia", "University of Pennsylvania")
+endLoc = ("698 N Atlantic Ave, Ocean City", "Boyfriend")
 
-
-for loc,name  in destList:
+for loc,name  in homeList:
 	# print(dest)
 	do_geocode(loc, name)
 	# location = geolocator.geocode(loc)
@@ -82,6 +78,11 @@ for loc,name  in destList:
 
 
 
+# timeList = [ ("3620 Walnut Street, Philadelphia", "University of Pennsylvania"),
+# 			("8000 York Rd, Towson", "Towson University"),
+# 			("4701 N Charles St, Baltimore", "Notre Dame of Maryland University"),
+# 			("2500 W North Ave, Baltimore", "Coppin State University"),
+# 			("11301 Springfield Rd, Laurel", "Capitol Technology University") ]
 
 # homeList = [ "University of Georgia Chapel, Herty Dr, Athens, GA 30602",
 # 			"1200 N Dupont Hwy, Dover, DE 19901",
