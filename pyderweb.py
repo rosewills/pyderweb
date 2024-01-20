@@ -23,18 +23,25 @@ from geopy.geocoders import Nominatim
 from geopy.exc import GeocoderTimedOut
 geolocator = Nominatim(user_agent="pyderweb")
 
-def do_geocode(address, name, attempt=1, maxAttempts=5):
+import openrouteservice
+from openrouteservice import convert
+import folium
+import json
+
+client = openrouteservice.Client(key='INSERT_OPENROUTESERVICE_API_KEY_HERE')
+
+
+def get_geocode(address, name, attempt=1, maxAttempts=5):
 	try:
-		# print("sleep")
 		location = geolocator.geocode(address)
-		print(name+":",location.address)
+		return location
 		sleep(1)
 
 	except GeocoderTimedOut:
 		if attempt <= maxAttempts:
 			# print("timeout for", address+",","re-attempt #"+str(attempt))
 			attempt = attempt + 1
-			do_geocode(address, name, attempt)
+			get_geocode(address, name, attempt)
 		else:
 			print("giving up on", name, "("+address+")")
 
@@ -66,17 +73,41 @@ destList = [ ("7051 Friendship Rd, Baltimore", "BWI Departures"),
 			("2450 S Milledge Ave, Athens", "Brother's House"),
 			("85554 Blue Rdg Pkwy, Bedford", "Family") ]
 
-startLoc = ("3620 Walnut Street, Philadelphia", "University of Pennsylvania")
-endLoc = ("698 N Atlantic Ave, Ocean City", "Boyfriend")
+startPlace,startName = ("3620 Walnut Street, Philadelphia", "University of Pennsylvania")
+endPlace,endName = ("698 N Atlantic Ave, Ocean City", "Boyfriend")
 
-for loc,name  in homeList:
-	# print(dest)
-	do_geocode(loc, name)
-	# location = geolocator.geocode(loc)
-	# print(location.address)
-	
+startLoc = get_geocode(startPlace, startName)
+endLoc = get_geocode(endPlace, endName)
+startCoors = (startLoc.latitude, startLoc.longitude)
+endCoors = (endLoc.latitude, endLoc.longitude)
+startCoorsFlip = (startLoc.longitude, startLoc.latitude)
+endCoorsFlip = (endLoc.longitude, endLoc.latitude)
+print(startName+":",startLoc.latitude, startLoc.longitude)
+print(endName+":",endLoc.latitude, endLoc.longitude)
+
+coors = (startCoorsFlip, endCoorsFlip)
+res = client.directions(coors)
+
+with(open('test-rw2.json','+w')) as f:
+	f.write(json.dumps(res,indent=4, sort_keys=True))
+
+testcoors = ((80.21787585263182,6.025423265401452),(80.23990263756545,6.018498276842677))
+testres = client.directions(testcoors)
+
+with(open('test-ex2.json','+w')) as f:
+	f.write(json.dumps(testres,indent=4, sort_keys=True))
+
+# coors = ((39.95285175,-75.19578558111155),(38.61995497051513,-75.10309938399392))
+# res = client.directions(coors)
 
 
+
+# for loc,name  in homeList:
+# 	get_geocode(loc, name)
+
+
+
+# coors = ((int(startLoc.latitude), int(startLoc.longitude)), (int(endLoc.latitude), int(endLoc.longitude)))
 
 # timeList = [ ("3620 Walnut Street, Philadelphia", "University of Pennsylvania"),
 # 			("8000 York Rd, Towson", "Towson University"),
