@@ -37,19 +37,33 @@ testres = client.directions(testcoors)
 def get_geocode(address, name, attempt=1, maxAttempts=5):
 	try:
 		location = geolocator.geocode(address)
+		# print(name+":",location.address)
 		return location
 		sleep(1)
 
 	except GeocoderTimedOut:
+		# print("GeocoderTimedOut for", address)
 		if attempt <= maxAttempts:
 			# print("timeout for", address+",","re-attempt #"+str(attempt))
 			attempt = attempt + 1
 			get_geocode(address, name, attempt)
 		else:
-			print("giving up on", name, "("+address+")")
+			# print("giving up on", name, "("+address+")")
+			errmess = "GeocoderTimedOut Error "+name+": giving up after 5 attempts."
+			return errmess
 
 	except AttributeError as e:
-		print("Error for", address, e)
+		# print("AttributeError for", address+":", e)
+		errmess = "AttributeError for "+name+": "+str(e)
+		return errmess
+
+	except Exception as e:
+		# print("Error:", name, "failed to run." )
+		errmess = "Unknown Error for "+name+": "+str(e)
+		return errmess
+	
+	# except ConnectionError as e:
+	# 	print("ConnectionError for", address+":", e)
 
 homeList = [ ("101 Sanford Dr, Athens", "University of Georgia"),
 			("1200 N Dupont Hwy, Dover", "Delaware State University"),
@@ -78,7 +92,8 @@ destList = [ ("7051 Friendship Rd, Baltimore", "BWI Departures"),
 
 homeShort = [ ("1200 N Dupont Hwy, Dover", "Delaware State University"),
 			("3620 Walnut Street, Philadelphia", "University of Pennsylvania"),
-			("620 W Lexington St, College Park", "University of Maryland") ]
+			("620 W Lexington St, College Park", "University of Maryland"),
+			 ("1420 N Charles St, Baltimore", "University of Baltimore") ]
 
 umd = [ ("620 W Lexington St, College Park", "University of Maryland") ]
 upa = [ ("3620 Walnut Street, Philadelphia", "University of Pennsylvania") ]
@@ -134,15 +149,24 @@ def get_route(startPlace, startName, endPlace, endName):
 # 		# print(homePlace, homeName, "----->", destPlace, destName)
 # 		get_route(homePlace, homeName, destPlace, destName)
 
-for homePlace,homeName in upa:
-	gcode = get_geocode(homePlace,homeName)
-	print("success")
-	print(gcode.latitude)
+for homePlace,homeName in homeShort:
+	homeLoc = get_geocode(homePlace,homeName)
+	try:
+		# print(homeName+":", homeLoc.address)
+		for destPlace,destName in destShort:
+			# print(homePlace, homeName, "----->", destPlace, destName)
+			get_route(homePlace, homeName, destPlace, destName)
+	except Exception as e:
+		try:
+			if "Error" in homeLoc:
+				print(homeLoc)
+			else:
+				raise Exception #print("ERROR: get_geocode() failed for ", homeName+": ", e)
+		except Exception:
+			print("ERROR: get_geocode() failed for "+homeName+": "+str(e))
 
-for homePlace,homeName in umd:
-	gcode = get_geocode(homePlace,homeName)
-	print("success")
-	print(gcode.latitude)
+# for homePlace,homeName in umd:
+# 	get_geocode(homePlace,homeName)
 
 
 
