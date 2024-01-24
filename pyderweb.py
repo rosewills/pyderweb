@@ -96,6 +96,12 @@ dPlace,dName = ("698 N Atlantic Ave, Ocean City", "Boyfriend")
 umd = [ ("620 W Lexington St, College Park", "University of Maryland") ]
 upa = [ ("3620 Walnut Street, Philadelphia", "University of Pennsylvania") ]
 
+destLocs = {}
+homeLocs = {}
+routeDict = {}
+
+destLen = 1
+homeLen = 1
 
 
 def get_geocode(address, name, attempt=1, maxAttempts=5):
@@ -129,7 +135,7 @@ def get_geocode(address, name, attempt=1, maxAttempts=5):
 		# errmess = colors.red+"get_geocode("+name+") [AttributeError]\n\t"+colors.yellow+str(e)+colors.endc
 
 
-def get_route(startLoc, startName, endLoc, endName, sMargin="\t", eMargin="\t"):
+def get_data(startLoc, startName, endLoc, endName):
 	# startLoc = get_geocode(startPlace, startName)
 	# endLoc = get_geocode(endPlace, endName)
 
@@ -142,41 +148,45 @@ def get_route(startLoc, startName, endLoc, endName, sMargin="\t", eMargin="\t"):
 		errmess = colors.red+"ERROR [get_route]: unknown error >>>\t"+colors.red+str(e)+colors.endc
 		return errmess
 
-	# print(startName+":",startLoc.latitude, startLoc.longitude)
-	# print(endName+":",endLoc.latitude, endLoc.longitude)
-	# print(endName, "<-----", startName) #, startCoor, "----->", endCoor)
-
-
 	coors = (startCoorFlip, endCoorFlip)
 	res = client.directions(coors)
-	geometry = client.directions(coors)['routes'][0]['geometry']
-	decoded = convert.decode_polyline(geometry)
-
-	# with(open('test-rw3.json','+w')) as f:
-	# 	f.write(json.dumps(res,indent=4, sort_keys=True))
 
 	distance = round(res['routes'][0]['summary']['distance']/1609.34,1)
 	duration = round(res['routes'][0]['summary']['duration']/60,1)
-	hours = math.floor(duration / 60)
-	mins = round(duration % 60)
-
-	if hours > 0 and mins > 0:
-		humanTime = str(hours)+"hr "+str(mins)+"min"
-	elif hours > 0:
-		humanTime = str(hours)+"hr"
-	elif mins > 0:
-		humanTime = str(mins)+"min"
-	else:
-		humanTime = "(n/a)"
 	
-	print(endName, eMargin, "<--", startName, sMargin, distance, "miles", "("+humanTime+")")
+	return coors, distance, duration
+	
+
+	# # Save Data (to .json)
+	# with(open(startName+'-'+endName+'.json','+w')) as f:
+	# 	f.write(json.dumps(res,indent=4, sort_keys=True))
+
+	geometry = client.directions(coors)['routes'][0]['geometry']
+	decoded = convert.decode_polyline(geometry)
+
+	# # Generate Map
+	# distance_txt = "<h4> <b>Distance:&nbsp" + "<strong>"+str(distance)+" miles </strong>" +"</h4></b>"
+	# duration_txt = "<h4> <b>Duration:&nbsp" + "<strong>"+str(time)+" mins</strong>" +"</h4></b>"
+
+	# m = folium.Map(location=startCoor,zoom_start=5, control_scale=True,tiles="cartodbpositron")
+
+	# folium.GeoJson(decoded).add_child(folium.Popup(distance_txt+duration_txt,max_width=300)).add_to(m)
+
+	# folium.Marker(
+	# 	location=list(coors[0][::-1]),
+	# 	popup="Home",
+	# 	icon=folium.Icon(color="green"),
+	# ).add_to(m)
+
+	# folium.Marker(
+	# 	location=list(coors[1][::-1]),
+	# 	popup="Dest",
+	# 	icon=folium.Icon(color="red"),
+	# ).add_to(m)
+
+	# m.save(startName+'-'+endName+'map.html')
 
 
-destLocs = {}
-homeLocs = {}
-
-destLen = 1
-homeLen = 1
 
 for destPlace,destName in destShort:
 	destLoc = get_geocode(destPlace,destName)
@@ -199,10 +209,24 @@ for homePlace,homeName in homeShort:
 for dest in destLocs:
 	# print("Returning routes to", dest+"...")
 	for home in homeLocs:
+		coors, distance, duration = get_data(homeLocs[home], home, destLocs[dest], dest)
+
+		hours = math.floor(duration / 60)
+		mins = round(duration % 60)
+		if hours > 0 and mins > 0:
+			humanTime = str(hours)+"hr "+str(mins)+"min"
+		elif hours > 0:
+			humanTime = str(hours)+"hr"
+		elif mins > 0:
+			humanTime = str(mins)+"min"
+		else:
+			humanTime = "(n/a)"
+
 		homeMargin = " " * ( homeLen - len(home) )
 		destMargin = " " * ( destLen - len(dest) )
-		get_route(homeLocs[home], home, destLocs[dest], dest, homeMargin, destMargin)
+		print(dest, destMargin, "<--", home, homeMargin, distance, "miles", "("+humanTime+")")
 
+		routeDict
 		# else:
 		# 	print(destName, "<-----", homeName+":", "<<< ERROR [unknown]: ", str(e), ">>>")
 
