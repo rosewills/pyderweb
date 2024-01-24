@@ -29,41 +29,31 @@ from openrouteservice import convert
 import folium
 import json
 
+class colors:
+    purple = '\033[95m'
+    blue = '\033[94m'
+    cyan = '\033[96m'
+    green = '\033[92m'
+    yellow = '\033[93m'
+    red = '\033[91m'
+    bold = '\033[1m'
+    underline = '\033[4m'
+    endc = '\033[0m'
+
+# print(colors.purple, "purple",
+# 	  colors.green, "green",
+# 	  colors.blue, "blue",
+# 	  colors.cyan, "cyan",
+# 	  colors.yellow, "yellow",
+# 	  colors.red, "red",
+# 	  colors.endc, "endc",
+# 	  colors.bold, "bold",
+# 	  colors.underline, "underline",
+# 	  colors.endc)
+
 client = openrouteservice.Client(key='INSERT_OPENROUTESERVICE_API_KEY_HERE')
 testcoors = ((80.21787585263182,6.025423265401452),(80.23990263756545,6.018498276842677))
 testres = client.directions(testcoors)
-
-
-def get_geocode(address, name, attempt=1, maxAttempts=5):
-	try:
-		location = geolocator.geocode(address)
-		# print(name+":",location.address)
-		return location
-		sleep(1)
-
-	except GeocoderTimedOut:
-		# print("GeocoderTimedOut for", address)
-		if attempt <= maxAttempts:
-			# print("timeout for", address+",","re-attempt #"+str(attempt))
-			attempt = attempt + 1
-			get_geocode(address, name, attempt)
-		else:
-			# print("giving up on", name, "("+address+")")
-			errmess = "GeocoderTimedOut Error "+name+": giving up after 5 attempts."
-			return errmess
-
-	except AttributeError as e:
-		# print("AttributeError for", address+":", e)
-		errmess = "AttributeError for "+name+": "+str(e)
-		return errmess
-
-	except Exception as e:
-		# print("Error:", name, "failed to run." )
-		errmess = "Unknown Error for "+name+": "+str(e)
-		return errmess
-	
-	# except ConnectionError as e:
-	# 	print("ConnectionError for", address+":", e)
 
 homeList = [ ("101 Sanford Dr, Athens", "University of Georgia"),
 			("1200 N Dupont Hwy, Dover", "Delaware State University"),
@@ -83,6 +73,7 @@ homeList = [ ("101 Sanford Dr, Athens", "University of Georgia"),
 			("11301 Springfield Rd, Laurel", "Capitol Technology University"),
 			("1000 Hilltop Circle, Baltimore", "University of Maryland, Baltimore County"),
 			("1420 N Charles St, Baltimore", "University of Baltimore"),
+			("210 S College Ave, Newark, DE 19711", "University of Delaware"),
 			("2901 Liberty Heights Ave, Baltimore", "Baltimore City Community College") ]
 
 destList = [ ("7051 Friendship Rd, Baltimore", "BWI Departures"),
@@ -90,13 +81,10 @@ destList = [ ("7051 Friendship Rd, Baltimore", "BWI Departures"),
 			("2450 S Milledge Ave, Athens", "Brother's House"),
 			("85554 Blue Rdg Pkwy, Bedford", "Family") ]
 
-homeShort = [ ("1200 N Dupont Hwy, Dover", "Delaware State University"),
+homeShort = [ ("801 College Rd, Dover", "Delaware State University"),
 			("3620 Walnut Street, Philadelphia", "University of Pennsylvania"),
-			("620 W Lexington St, College Park", "University of Maryland"),
+			("7999 Regents Dr, College Park", "University of Maryland"),
 			 ("1420 N Charles St, Baltimore", "University of Baltimore") ]
-
-umd = [ ("620 W Lexington St, College Park", "University of Maryland") ]
-upa = [ ("3620 Walnut Street, Philadelphia", "University of Pennsylvania") ]
 
 destShort = [ ("698 N Atlantic Ave, Ocean City", "Boyfriend"),
 			("2450 S Milledge Ave, Athens", "Brother's House"),
@@ -105,27 +93,67 @@ destShort = [ ("698 N Atlantic Ave, Ocean City", "Boyfriend"),
 hPlace,hName = ("3620 Walnut Street, Philadelphia", "University of Pennsylvania")
 dPlace,dName = ("698 N Atlantic Ave, Ocean City", "Boyfriend")
 
-def get_route(startPlace, startName, endPlace, endName):
-	startLoc = get_geocode(startPlace, startName)
-	endLoc = get_geocode(endPlace, endName)
+umd = [ ("620 W Lexington St, College Park", "University of Maryland") ]
+upa = [ ("3620 Walnut Street, Philadelphia", "University of Pennsylvania") ]
 
-	startCoor = (startLoc.latitude, startLoc.longitude)
-	endCoor = (endLoc.latitude, endLoc.longitude)
-	startCoorFlip = (startLoc.longitude, startLoc.latitude)
-	endCoorFlip = (endLoc.longitude, endLoc.latitude)
+
+
+def get_geocode(address, name, attempt=1, maxAttempts=5):
+	try:
+		location = geolocator.geocode(address)
+		# print(name+":",location.address)
+		return location
+		sleep(1)
+
+	except GeocoderTimedOut:
+		# print("GeocoderTimedOut for", address)
+		if attempt <= maxAttempts:
+			# print("timeout for", address+",","re-attempt #"+str(attempt))
+			attempt = attempt + 1
+			get_geocode(address, name, attempt)
+		else:
+			# print("giving up on", name, "("+address+")")
+			errmess = colors.red+"ERROR [get_geocode]: GeocoderTimedOut >>> "+name+"\n\t"+colors.yellow+"giving up after 5 attempts."+colors.endc
+			return errmess
+
+	except AttributeError as e:
+		# print("AttributeError for", address+":", e)
+		errmess = colors.red+"ERROR [get_geocode]: AttributeError >>> "+name+"\n\t"+colors.yellow+str(e)+colors.endc
+		return errmess
+
+	except Exception as e:
+		# print("Error:", name, "failed to run." )
+		errmess = colors.red+"ERROR [get_geocode]: unknown error >>> "+name+"\n\t"+colors.yellow+str(e)+colors.endc
+		return errmess
+	
+		# errmess = colors.red+"get_geocode("+name+") [AttributeError]\n\t"+colors.yellow+str(e)+colors.endc
+
+
+def get_route(startLoc, startName, endLoc, endName):
+	# startLoc = get_geocode(startPlace, startName)
+	# endLoc = get_geocode(endPlace, endName)
+
+	try:
+		startCoor = (startLoc.latitude, startLoc.longitude)
+		endCoor = (endLoc.latitude, endLoc.longitude)
+		startCoorFlip = (startLoc.longitude, startLoc.latitude)
+		endCoorFlip = (endLoc.longitude, endLoc.latitude)
+	except Exception as e:
+		errmess = colors.red+"ERROR [get_route]: unknown error >>>\t"+colors.red+str(e)+colors.endc
+		return errmess
 
 	# print(startName+":",startLoc.latitude, startLoc.longitude)
 	# print(endName+":",endLoc.latitude, endLoc.longitude)
+	# print(endName, "<-----", startName) #, startCoor, "----->", endCoor)
 
-	print(startName, "----->", endName, startCoor, "----->", endCoor)
 
 	coors = (startCoorFlip, endCoorFlip)
 	res = client.directions(coors)
 	geometry = client.directions(coors)['routes'][0]['geometry']
 	decoded = convert.decode_polyline(geometry)
 
-	with(open('test-rw3.json','+w')) as f:
-		f.write(json.dumps(res,indent=4, sort_keys=True))
+	# with(open('test-rw3.json','+w')) as f:
+	# 	f.write(json.dumps(res,indent=4, sort_keys=True))
 
 	distance = round(res['routes'][0]['summary']['distance']/1609.34,1)
 	duration = round(res['routes'][0]['summary']['duration']/60,1)
@@ -141,33 +169,35 @@ def get_route(startPlace, startName, endPlace, endName):
 	else:
 		humanTime = "(n/a)"
 
-	print(distance, "miles", "("+humanTime+")")
+	print(endName, "\t<--\t", startName+":\t", distance, "miles", "("+humanTime+")")
+
+destLocs = {}
+homeLocs = {}
 
 
-# for homePlace,homeName in umd:
-# 	for destPlace,destName in destShort:
-# 		# print(homePlace, homeName, "----->", destPlace, destName)
-# 		get_route(homePlace, homeName, destPlace, destName)
+for destPlace,destName in destShort:
+	destLoc = get_geocode(destPlace,destName)
+	# print("dest:", destName)
+	# destLocs[destName] = destLoc
 
-for homePlace,homeName in homeShort:
-	homeLoc = get_geocode(homePlace,homeName)
-	try:
-		# print(homeName+":", homeLoc.address)
-		for destPlace,destName in destShort:
-			# print(homePlace, homeName, "----->", destPlace, destName)
-			get_route(homePlace, homeName, destPlace, destName)
-	except Exception as e:
-		try:
-			if "Error" in homeLoc:
-				print(homeLoc)
-			else:
-				raise Exception #print("ERROR: get_geocode() failed for ", homeName+": ", e)
-		except Exception:
-			print("ERROR: get_geocode() failed for "+homeName+": "+str(e))
+		
+	for homePlace,homeName in homeShort:
+		# print("home:", homeName)
+		homeLoc = get_geocode(homePlace,homeName)
+		if "Error" in homeLoc:
+			print(homeLoc)
+		else:
+			# print(destName, "<-----", homeName+":", homeLoc)
+			get_route(homeLoc, homeName, destLoc, destName)
+
+		# else:
+		# 	print(destName, "<-----", homeName+":", "<<< ERROR [unknown]: ", str(e), ">>>")
 
 # for homePlace,homeName in umd:
 # 	get_geocode(homePlace,homeName)
 
+			# print(homeName+":",type(homeLoc))
+			# print(homePlace, homeName, "----->", destPlace, destName)
 
 
 # humanTime = str(math.floor(duration / 60)+"hrs, "+str(duration % 60)+"mins")
@@ -214,6 +244,10 @@ for homePlace,homeName in homeShort:
 
 
 
+# for homePlace,homeName in umd:
+# 	for destPlace,destName in destShort:
+# 		# print(homePlace, homeName, "----->", destPlace, destName)
+# 		get_route(homePlace, homeName, destPlace, destName)
 
 
 # coors = ((int(startLoc.latitude), int(startLoc.longitude)), (int(endLoc.latitude), int(endLoc.longitude)))
@@ -242,9 +276,12 @@ for homePlace,homeName in homeShort:
 # 			"11301 Springfield Rd, Laurel, MD 20708",
 # 			"1000 Hilltop Circle, Baltimore, MD 21250",
 # 			"1420 N Charles St, Baltimore, MD 21202",
-# 			"2901 Liberty Heights Ave, Baltimore, MD 21215" ]
+# 			"2901 Liberty Heights Ave, Baltimore, MD 21215",
+#			"210 S College Ave, Newark, DE 19711" ]
 
 # destList = [ "7051 Friendship Rd, Baltimore, MD 21240",
 # 			"698 N Atlantic Ave, Ocean City, MD 21842",
 # 			"2450 S Milledge Ave, Athens, MD 20636",
 # 			"85554 Blue Rdg Pkwy, Bedford, PA 18508" ]
+			
+#			North Dupont Highway, Dover, Kent County, Delaware, 19901, United States
