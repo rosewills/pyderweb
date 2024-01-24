@@ -129,7 +129,7 @@ def get_geocode(address, name, attempt=1, maxAttempts=5):
 		# errmess = colors.red+"get_geocode("+name+") [AttributeError]\n\t"+colors.yellow+str(e)+colors.endc
 
 
-def get_route(startLoc, startName, endLoc, endName):
+def get_route(startLoc, startName, endLoc, endName, sMargin="\t", eMargin="\t"):
 	# startLoc = get_geocode(startPlace, startName)
 	# endLoc = get_geocode(endPlace, endName)
 
@@ -168,27 +168,40 @@ def get_route(startLoc, startName, endLoc, endName):
 		humanTime = str(mins)+"min"
 	else:
 		humanTime = "(n/a)"
+	
+	print(endName, eMargin, "<--", startName, sMargin, distance, "miles", "("+humanTime+")")
 
-	print(endName, "\t<--\t", startName+":\t", distance, "miles", "("+humanTime+")")
 
 destLocs = {}
 homeLocs = {}
 
+destLen = 1
+homeLen = 1
 
 for destPlace,destName in destShort:
 	destLoc = get_geocode(destPlace,destName)
-	# print("dest:", destName)
-	# destLocs[destName] = destLoc
+	destLocs[destName] = destLoc
+	print("...added", destName, "to destLocs")
+	if len(destName) > destLen:
+		destLen = len(destName)
 
-		
-	for homePlace,homeName in homeShort:
-		# print("home:", homeName)
-		homeLoc = get_geocode(homePlace,homeName)
-		if "Error" in homeLoc:
-			print(homeLoc)
-		else:
-			# print(destName, "<-----", homeName+":", homeLoc)
-			get_route(homeLoc, homeName, destLoc, destName)
+
+for homePlace,homeName in homeShort:
+	homeLoc = get_geocode(homePlace,homeName)
+	if "Error" in homeLoc:
+		print(homeLoc)
+	else:
+		homeLocs[homeName] = homeLoc
+		print("...added", homeName, "to homeLocs")
+		if len(homeName) > homeLen:
+			homeLen = len(homeName)
+
+for dest in destLocs:
+	# print("Returning routes to", dest+"...")
+	for home in homeLocs:
+		homeMargin = " " * ( homeLen - len(home) )
+		destMargin = " " * ( destLen - len(dest) )
+		get_route(homeLocs[home], home, destLocs[dest], dest, homeMargin, destMargin)
 
 		# else:
 		# 	print(destName, "<-----", homeName+":", "<<< ERROR [unknown]: ", str(e), ">>>")
