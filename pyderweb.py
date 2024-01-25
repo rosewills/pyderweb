@@ -184,10 +184,14 @@ def gen_map(destDict, homeDict, focus, mapName):
 				homeLen = len(homeName)
 
 	# Generate Map
-	m = folium.Map(location=(focusLoc.latitude, focusLoc.longitude),zoom_start=10, control_scale=True,tiles="cartodbpositron")
-
+	colorDict = {}
+	for home in homeLocs:
+		cVals = random.choices(range(256), k=3)
+		homeColor = "rgb("+str(cVals[0])+","+str(cVals[1])+","+str(cVals[2])+")"
+		colorDict[home] = homeColor
+	
 	for dest in destLocs:
-
+		m = folium.Map(location=(focusLoc.latitude, focusLoc.longitude),zoom_start=10, control_scale=True,tiles="cartodbpositron")
 		for home in homeLocs:
 			# Get Data
 			coors, distance, duration = get_data(homeLocs[home], home, destLocs[dest], dest)
@@ -218,8 +222,8 @@ def gen_map(destDict, homeDict, focus, mapName):
 			distancetxt = "<b><strong>"+str(distance)+" miles </strong></b></br>"
 			durationtxt = "<b><strong>"+str(duration)+" mins</strong></b>"
 
-			cVals = random.choices(range(256), k=3)
-			routeColor = "rgb("+str(cVals[0])+","+str(cVals[1])+","+str(cVals[2])+")"
+
+			routeColor = colorDict[home]
 			# print(routeColor)
 
 			fillColor = routeColor
@@ -248,11 +252,15 @@ def gen_map(destDict, homeDict, focus, mapName):
 			).add_to(m)
 
 			# print(colors.purple+home+colors.endc+" to "+colors.cyan+dest+colors.endc+" added to "+mapName)
-
 			
-	m.save(mapName+'.html')
+		destName = dest.replace(" ", "-")
+		destName = destName.replace(".", "")
+		destName = destName.replace(",", "")
+		destName = destName.replace("'", "")
+		saveName = mapName+destName+".html"
+		m.save(saveName)
 
-gen_map(destShort, homeShort, center, "genmap-test")
+gen_map(destShort, homeShort, center, "")
 
 		# else:
 		# 	print(destName, "<-----", homeName+":", "<<< ERROR [unknown]: ", str(e), ">>>")
