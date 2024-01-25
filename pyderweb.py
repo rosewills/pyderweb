@@ -56,52 +56,45 @@ client = openrouteservice.Client(key='INSERT_OPENROUTESERVICE_API_KEY_HERE')
 testcoors = ((80.21787585263182,6.025423265401452),(80.23990263756545,6.018498276842677))
 testres = client.directions(testcoors)
 
-center = "7051 Friendship Rd, Baltimore"
+homes = { "University of Georgia": "101 Sanford Dr, Athens",
+			"Delaware State University": "1200 N Dupont Hwy, Dover",
+			"University of Pennsylvania": "3620 Walnut Street, Philadelphia",
+			"University of Maryland": "620 W Lexington St, College Park",
+			"Towson University": "8000 York Rd, Towson",
+			"Johns Hopkins University": "3101 Wyman Park Drive, Baltimore",
+			"Bowie State University": "14000 Jericho Park Rd, Bowie",
+			"Loyola University Maryland": "4501 N. Charles Street, Baltimore",
+			"Notre Dame of Maryland University": "4701 N Charles St, Baltimore",
+			"Morgan State University": "1700 E Cold Spring Ln, Baltimore",
+			"Coppin State University": "2500 W North Ave, Baltimore",
+			"Maryland Institute College of Art": "1300 W Mount Royal Ave, Baltimore",
+			"Goucher College": "1021 Dulaney Valley Rd, Baltimore",
+			"St. John's College": "60 College Ave, Annapolis",
+			"United States Naval Academy": "121 Blake Rd, Annapolis",
+			"Capitol Technology University": "11301 Springfield Rd, Laurel",
+			"University of Maryland, Baltimore County": "1000 Hilltop Circle, Baltimore",
+			"University of Baltimore": "1420 N Charles St, Baltimore",
+			"University of Delaware": "210 S College Ave, Newark, DE 19711",
+			"Baltimore City Community College": "2901 Liberty Heights Ave, Baltimore" }
 
-homeList = [ ("101 Sanford Dr, Athens", "University of Georgia"),
-			("1200 N Dupont Hwy, Dover", "Delaware State University"),
-			("3620 Walnut Street, Philadelphia", "University of Pennsylvania"),
-			("620 W Lexington St, College Park", "University of Maryland"),
-			("8000 York Rd, Towson", "Towson University"),
-			("3101 Wyman Park Drive, Baltimore", "Johns Hopkins University"),
-			("14000 Jericho Park Rd, Bowie", "Bowie State University"),
-			("4501 N. Charles Street, Baltimore", "Loyola University Maryland"),
-			("4701 N Charles St, Baltimore", "Notre Dame of Maryland University"),
-			("1700 E Cold Spring Ln, Baltimore", "Morgan State University"),
-			("2500 W North Ave, Baltimore", "Coppin State University"),
-			("1300 W Mount Royal Ave, Baltimore", "Maryland Institute College of Art"),
-			("1021 Dulaney Valley Rd, Baltimore", "Goucher College"),
-			("60 College Ave, Annapolis", "St. John's College"),
-			("121 Blake Rd, Annapolis", "United States Naval Academy"),
-			("11301 Springfield Rd, Laurel", "Capitol Technology University"),
-			("1000 Hilltop Circle, Baltimore", "University of Maryland, Baltimore County"),
-			("1420 N Charles St, Baltimore", "University of Baltimore"),
-			("210 S College Ave, Newark, DE 19711", "University of Delaware"),
-			("2901 Liberty Heights Ave, Baltimore", "Baltimore City Community College") ]
+dests = { "BWI Departures": "7051 Friendship Rd, Baltimore",
+			"Boyfriend": "698 N Atlantic Ave, Ocean City",
+			"Brother's House": "2450 S Milledge Ave, Athens",
+			"Family": "85554 Blue Rdg Pkwy, Bedford" }
 
-destList = [ ("7051 Friendship Rd, Baltimore", "BWI Departures"),
-			("698 N Atlantic Ave, Ocean City", "Boyfriend"),
-			("2450 S Milledge Ave, Athens", "Brother's House"),
-			("85554 Blue Rdg Pkwy, Bedford", "Family") ]
+homeShort = { "Delaware State University": "801 College Rd, Dover",
+			 "University of Pennsylvania": "3620 Walnut Street, Philadelphia",
+			 "University of Maryland": "7999 Regents Dr, College Park",
+			 "University of Baltimore": "1420 N Charles St, Baltimore" }
 
-homeShort = [ ("801 College Rd, Dover", "Delaware State University"),
-			("3620 Walnut Street, Philadelphia", "University of Pennsylvania"),
-			("7999 Regents Dr, College Park", "University of Maryland"),
-			 ("1420 N Charles St, Baltimore", "University of Baltimore") ]
+destShort = { "Boyfriend": "698 N Atlantic Ave, Ocean City",
+			 "Brother's House": "2450 S Milledge Ave, Athens",
+			 "Family": "85554 Blue Rdg Pkwy, Bedford" }
 
-destShort = [ ("698 N Atlantic Ave, Ocean City", "Boyfriend"),
-			("2450 S Milledge Ave, Athens", "Brother's House"),
-			("85554 Blue Rdg Pkwy, Bedford", "Family") ]
-
-hPlace,hName = ("3620 Walnut Street, Philadelphia", "University of Pennsylvania")
-dPlace,dName = ("698 N Atlantic Ave, Ocean City", "Boyfriend")
-
-umd = [ ("620 W Lexington St, College Park", "University of Maryland") ]
-upa = [ ("3620 Walnut Street, Philadelphia", "University of Pennsylvania") ]
+center = dests["BWI Departures"]
 
 destLocs = {}
 homeLocs = {}
-routeDict = {}
 
 
 
@@ -163,7 +156,7 @@ def get_data(startLoc, startName, endLoc, endName):
 
 
 # Get focus point of map
-def gen_map(dests, homes, focus, mapName):
+def gen_map(destDict, homeDict, focus, mapName):
 	focusLoc = get_geocode(focus, focus+" (CENTER)")
 	if "Error" in focusLoc:
 		print(colors.red+focusLoc+colors.endc)
@@ -172,16 +165,16 @@ def gen_map(dests, homes, focus, mapName):
 	destLen = 1
 	homeLen = 1
 
-	for destPlace,destName in dests:
-		destLoc = get_geocode(destPlace,destName)
+	for destName in destDict:
+		destLoc = get_geocode(destDict[destName],destName)
 		destLocs[destName] = destLoc
 		print("...added", destName, "to destLocs")
 		if len(destName) > destLen:
 			destLen = len(destName)
 
 
-	for homePlace,homeName in homes:
-		homeLoc = get_geocode(homePlace,homeName)
+	for homeName in homeDict:
+		homeLoc = get_geocode(homeDict[homeName],homeName)
 		if "Error" in homeLoc:
 			print(colors.red+homeLoc+colors.endc)
 		else:
@@ -227,7 +220,7 @@ def gen_map(dests, homes, focus, mapName):
 
 			cVals = random.choices(range(256), k=3)
 			routeColor = "rgb("+str(cVals[0])+","+str(cVals[1])+","+str(cVals[2])+")"
-			print(routeColor)
+			# print(routeColor)
 
 			fillColor = routeColor
 			color = routeColor
@@ -322,6 +315,56 @@ gen_map(destShort, homeShort, center, "genmap-test")
 
 
 # coors = ((int(startLoc.latitude), int(startLoc.longitude)), (int(endLoc.latitude), int(endLoc.longitude)))
+
+
+
+# cat list-scratch | while read -r line; do echo $line | sed 's|^\(.*[(]\)\(".*"\)\(, \)\(".*"\)\(.*\)|\1\4\3\2\5|g' ; done
+
+# homeList = [ ("101 Sanford Dr, Athens", "University of Georgia"),
+# 			("1200 N Dupont Hwy, Dover", "Delaware State University"),
+# 			("3620 Walnut Street, Philadelphia", "University of Pennsylvania"),
+# 			("620 W Lexington St, College Park", "University of Maryland"),
+# 			("8000 York Rd, Towson", "Towson University"),
+# 			("3101 Wyman Park Drive, Baltimore", "Johns Hopkins University"),
+# 			("14000 Jericho Park Rd, Bowie", "Bowie State University"),
+# 			("4501 N. Charles Street, Baltimore", "Loyola University Maryland"),
+# 			("4701 N Charles St, Baltimore", "Notre Dame of Maryland University"),
+# 			("1700 E Cold Spring Ln, Baltimore", "Morgan State University"),
+# 			("2500 W North Ave, Baltimore", "Coppin State University"),
+# 			("1300 W Mount Royal Ave, Baltimore", "Maryland Institute College of Art"),
+# 			("1021 Dulaney Valley Rd, Baltimore", "Goucher College"),
+# 			("60 College Ave, Annapolis", "St. John's College"),
+# 			("121 Blake Rd, Annapolis", "United States Naval Academy"),
+# 			("11301 Springfield Rd, Laurel", "Capitol Technology University"),
+# 			("1000 Hilltop Circle, Baltimore", "University of Maryland, Baltimore County"),
+# 			("1420 N Charles St, Baltimore", "University of Baltimore"),
+# 			("210 S College Ave, Newark, DE 19711", "University of Delaware"),
+# 			("2901 Liberty Heights Ave, Baltimore", "Baltimore City Community College") ]
+
+# destList = [ ("7051 Friendship Rd, Baltimore", "BWI Departures"),
+# 			("698 N Atlantic Ave, Ocean City", "Boyfriend"),
+# 			("2450 S Milledge Ave, Athens", "Brother's House"),
+# 			("85554 Blue Rdg Pkwy, Bedford", "Family") ]
+
+# homeShort = [ ("801 College Rd, Dover", "Delaware State University"),
+# 			("3620 Walnut Street, Philadelphia", "University of Pennsylvania"),
+# 			("7999 Regents Dr, College Park", "University of Maryland"),
+# 			("1420 N Charles St, Baltimore", "University of Baltimore") ]
+
+# destShort = [ ("698 N Atlantic Ave, Ocean City", "Boyfriend"),
+# 			("2450 S Milledge Ave, Athens", "Brother's House"),
+# 			("85554 Blue Rdg Pkwy, Bedford", "Family") ]
+
+# hPlace,hName = ("3620 Walnut Street, Philadelphia", "University of Pennsylvania")
+# dPlace,dName = ("698 N Atlantic Ave, Ocean City", "Boyfriend")
+
+# umd = [ ("620 W Lexington St, College Park", "University of Maryland") ]
+# upa = [ ("3620 Walnut Street, Philadelphia", "University of Pennsylvania") ]
+
+
+
+
+
 
 # timeList = [ ("3620 Walnut Street, Philadelphia", "University of Pennsylvania"),
 # 			("8000 York Rd, Towson", "Towson University"),
