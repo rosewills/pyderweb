@@ -18,6 +18,7 @@ with dis in miles, 1 column/dest with eta in minutes)
 '''
 
 import csv
+import random
 import math
 from time import sleep
 from geopy.geocoders import Nominatim
@@ -163,7 +164,10 @@ def get_data(startLoc, startName, endLoc, endName):
 
 # Get focus point of map
 def gen_map(dests, homes, focus, mapName):
-	focusLoc = get_geocode(focus, "CENTER")
+	focusLoc = get_geocode(focus, focus+" (CENTER)")
+	if "Error" in focusLoc:
+		print(colors.red+focusLoc+colors.endc)
+		return
 
 	destLen = 1
 	homeLen = 1
@@ -179,7 +183,7 @@ def gen_map(dests, homes, focus, mapName):
 	for homePlace,homeName in homes:
 		homeLoc = get_geocode(homePlace,homeName)
 		if "Error" in homeLoc:
-			print(homeLoc)
+			print(colors.red+homeLoc+colors.endc)
 		else:
 			homeLocs[homeName] = homeLoc
 			print("...added", homeName, "to homeLocs")
@@ -187,7 +191,7 @@ def gen_map(dests, homes, focus, mapName):
 				homeLen = len(homeName)
 
 	# Generate Map
-	m = folium.Map(location=(focusLoc.latitude, focusLoc.longitude),zoom_start=5, control_scale=True,tiles="cartodbpositron")
+	m = folium.Map(location=(focusLoc.latitude, focusLoc.longitude),zoom_start=10, control_scale=True,tiles="cartodbpositron")
 
 	for dest in destLocs:
 
@@ -215,11 +219,28 @@ def gen_map(dests, homes, focus, mapName):
 			geometry = client.directions(coors)['routes'][0]['geometry']
 			decoded = convert.decode_polyline(geometry)
 
-			labeltxt = "<h4> <b><strong>"+home+" to "+dest+"</strong></h4></b>"
-			distancetxt = "<h4> <b><strong>"+str(distance)+" miles </strong></h4></b>"
-			durationtxt = "<h4> <b><strong>"+str(duration)+" mins</strong></h4></b>"
+			routeName = home+" --> "+dest
 
-			folium.GeoJson(decoded).add_child(folium.Popup(labeltxt+distancetxt+durationtxt,max_width=300)).add_to(m)
+			labeltxt = "<b><strong>"+routeName+"</strong></b></br>"
+			distancetxt = "<b><strong>"+str(distance)+" miles </strong></b></br>"
+			durationtxt = "<b><strong>"+str(duration)+" mins</strong></b>"
+
+			cVals = random.choices(range(256), k=3)
+			routeColor = "rgb("+str(cVals[0])+","+str(cVals[1])+","+str(cVals[2])+")"
+			print(routeColor)
+
+			fillColor = routeColor
+			color = routeColor
+			# routeStyle = {'fillColor': routeColor, 'color': routeColor } # {'fillColor': '#00FFFFFF', 'color': '#00FFFFFF'} {'fillColor': '#228B22', 'color': '#228B22'}
+
+			folium.GeoJson(
+				decoded,
+				name=routeName,
+				style_function=lambda x, fillColor=fillColor, color=color: {
+					"fillColor": fillColor,
+					"color": color,
+				},
+			).add_child(folium.Popup(labeltxt+distancetxt+durationtxt,max_width=300)).add_to(m)
 
 			folium.Marker(
 				location=list(coors[0][::-1]),
@@ -233,7 +254,7 @@ def gen_map(dests, homes, focus, mapName):
 				icon=folium.Icon(color="red"),
 			).add_to(m)
 
-			print(colors.purple+home+colors.endc+" to "+colors.cyan+dest+colors.endc+" added to "+mapName)
+			# print(colors.purple+home+colors.endc+" to "+colors.cyan+dest+colors.endc+" added to "+mapName)
 
 			
 	m.save(mapName+'.html')
