@@ -55,6 +55,8 @@ client = openrouteservice.Client(key='INSERT_OPENROUTESERVICE_API_KEY_HERE')
 testcoors = ((80.21787585263182,6.025423265401452),(80.23990263756545,6.018498276842677))
 testres = client.directions(testcoors)
 
+center = "7051 Friendship Rd, Baltimore"
+
 homeList = [ ("101 Sanford Dr, Athens", "University of Georgia"),
 			("1200 N Dupont Hwy, Dover", "Delaware State University"),
 			("3620 Walnut Street, Philadelphia", "University of Pennsylvania"),
@@ -100,8 +102,6 @@ destLocs = {}
 homeLocs = {}
 routeDict = {}
 
-destLen = 1
-homeLen = 1
 
 
 def get_geocode(address, name, attempt=1, maxAttempts=5):
@@ -155,78 +155,91 @@ def get_data(startLoc, startName, endLoc, endName):
 	duration = round(res['routes'][0]['summary']['duration']/60,1)
 	
 	return coors, distance, duration
-	
 
 	# # Save Data (to .json)
 	# with(open(startName+'-'+endName+'.json','+w')) as f:
 	# 	f.write(json.dumps(res,indent=4, sort_keys=True))
 
-	geometry = client.directions(coors)['routes'][0]['geometry']
-	decoded = convert.decode_polyline(geometry)
 
-	# # Generate Map
-	# distance_txt = "<h4> <b>Distance:&nbsp" + "<strong>"+str(distance)+" miles </strong>" +"</h4></b>"
-	# duration_txt = "<h4> <b>Duration:&nbsp" + "<strong>"+str(time)+" mins</strong>" +"</h4></b>"
+# Get focus point of map
+def gen_map(dests, homes, focus, mapName):
+	focusLoc = get_geocode(focus, "CENTER")
 
-	# m = folium.Map(location=startCoor,zoom_start=5, control_scale=True,tiles="cartodbpositron")
+	destLen = 1
+	homeLen = 1
 
-	# folium.GeoJson(decoded).add_child(folium.Popup(distance_txt+duration_txt,max_width=300)).add_to(m)
-
-	# folium.Marker(
-	# 	location=list(coors[0][::-1]),
-	# 	popup="Home",
-	# 	icon=folium.Icon(color="green"),
-	# ).add_to(m)
-
-	# folium.Marker(
-	# 	location=list(coors[1][::-1]),
-	# 	popup="Dest",
-	# 	icon=folium.Icon(color="red"),
-	# ).add_to(m)
-
-	# m.save(startName+'-'+endName+'map.html')
+	for destPlace,destName in dests:
+		destLoc = get_geocode(destPlace,destName)
+		destLocs[destName] = destLoc
+		print("...added", destName, "to destLocs")
+		if len(destName) > destLen:
+			destLen = len(destName)
 
 
-
-for destPlace,destName in destShort:
-	destLoc = get_geocode(destPlace,destName)
-	destLocs[destName] = destLoc
-	print("...added", destName, "to destLocs")
-	if len(destName) > destLen:
-		destLen = len(destName)
-
-
-for homePlace,homeName in homeShort:
-	homeLoc = get_geocode(homePlace,homeName)
-	if "Error" in homeLoc:
-		print(homeLoc)
-	else:
-		homeLocs[homeName] = homeLoc
-		print("...added", homeName, "to homeLocs")
-		if len(homeName) > homeLen:
-			homeLen = len(homeName)
-
-for dest in destLocs:
-	# print("Returning routes to", dest+"...")
-	for home in homeLocs:
-		coors, distance, duration = get_data(homeLocs[home], home, destLocs[dest], dest)
-
-		hours = math.floor(duration / 60)
-		mins = round(duration % 60)
-		if hours > 0 and mins > 0:
-			humanTime = str(hours)+"hr "+str(mins)+"min"
-		elif hours > 0:
-			humanTime = str(hours)+"hr"
-		elif mins > 0:
-			humanTime = str(mins)+"min"
+	for homePlace,homeName in homes:
+		homeLoc = get_geocode(homePlace,homeName)
+		if "Error" in homeLoc:
+			print(homeLoc)
 		else:
-			humanTime = "(n/a)"
+			homeLocs[homeName] = homeLoc
+			print("...added", homeName, "to homeLocs")
+			if len(homeName) > homeLen:
+				homeLen = len(homeName)
 
-		homeMargin = " " * ( homeLen - len(home) )
-		destMargin = " " * ( destLen - len(dest) )
-		print(dest, destMargin, "<--", home, homeMargin, distance, "miles", "("+humanTime+")")
+	# Generate Map
+	m = folium.Map(location=(focusLoc.latitude, focusLoc.longitude),zoom_start=5, control_scale=True,tiles="cartodbpositron")
 
-		routeDict
+	for dest in destLocs:
+
+		for home in homeLocs:
+			# Get Data
+			coors, distance, duration = get_data(homeLocs[home], home, destLocs[dest], dest)
+
+			# Convert Time to Human-Readable
+			hours = math.floor(duration / 60)
+			mins = round(duration % 60)
+			if hours > 0 and mins > 0:
+				humanTime = str(hours)+"hr "+str(mins)+"min"
+			elif hours > 0:
+				humanTime = str(hours)+"hr"
+			elif mins > 0:
+				humanTime = str(mins)+"min"
+			else:
+				humanTime = "(n/a)"
+
+			# Fix Margins on Terminal Output Text
+			homeMargin = " " * ( homeLen - len(home) )
+			destMargin = " " * ( destLen - len(dest) )
+			print(dest, destMargin, "<--", home, homeMargin, distance, "miles", "("+humanTime+")")
+
+			geometry = client.directions(coors)['routes'][0]['geometry']
+			decoded = convert.decode_polyline(geometry)
+
+			labeltxt = "<h4> <b><strong>"+home+" to "+dest+"</strong></h4></b>"
+			distancetxt = "<h4> <b><strong>"+str(distance)+" miles </strong></h4></b>"
+			durationtxt = "<h4> <b><strong>"+str(duration)+" mins</strong></h4></b>"
+
+			folium.GeoJson(decoded).add_child(folium.Popup(labeltxt+distancetxt+durationtxt,max_width=300)).add_to(m)
+
+			folium.Marker(
+				location=list(coors[0][::-1]),
+				popup=home,
+				icon=folium.Icon(color="green"),
+			).add_to(m)
+
+			folium.Marker(
+				location=list(coors[1][::-1]),
+				popup=dest,
+				icon=folium.Icon(color="red"),
+			).add_to(m)
+
+			print(colors.purple+home+colors.endc+" to "+colors.cyan+dest+colors.endc+" added to "+mapName)
+
+			
+	m.save(mapName+'.html')
+
+gen_map(destShort, homeShort, center, "genmap-test")
+
 		# else:
 		# 	print(destName, "<-----", homeName+":", "<<< ERROR [unknown]: ", str(e), ">>>")
 
