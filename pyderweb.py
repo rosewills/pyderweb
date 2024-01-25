@@ -45,19 +45,9 @@ class colors:
     underline = '\033[4m'
     endc = '\033[0m'
 
-# print(colors.purple, "purple",
-# 	  colors.green, "green",
-# 	  colors.blue, "blue",
-# 	  colors.cyan, "cyan",
-# 	  colors.yellow, "yellow",
-# 	  colors.red, "red",
-# 	  colors.endc, "endc",
-# 	  colors.bold, "bold",
-# 	  colors.underline, "underline",
-# 	  colors.endc)
 
-testcoors = ((80.21787585263182,6.025423265401452),(80.23990263756545,6.018498276842677))
-testres = client.directions(testcoors)
+# testcoors = ((80.21787585263182,6.025423265401452),(80.23990263756545,6.018498276842677))
+# testres = client.directions(testcoors)
 
 homes = { "University of Georgia": "101 Sanford Dr, Athens",
 			"Delaware State University": "1200 N Dupont Hwy, Dover",
@@ -71,14 +61,15 @@ homes = { "University of Georgia": "101 Sanford Dr, Athens",
 			"Morgan State University": "1700 E Cold Spring Ln, Baltimore",
 			"Coppin State University": "2500 W North Ave, Baltimore",
 			"Maryland Institute College of Art": "1300 W Mount Royal Ave, Baltimore",
-			"Goucher College": "1021 Dulaney Valley Rd, Baltimore",
+			"Goucher College": "949 Dulaney Valley Rd, Baltimore",
 			"St. John's College": "60 College Ave, Annapolis",
 			"United States Naval Academy": "121 Blake Rd, Annapolis",
 			"Capitol Technology University": "11301 Springfield Rd, Laurel",
 			"University of Maryland, Baltimore County": "1000 Hilltop Circle, Baltimore",
 			"University of Baltimore": "1420 N Charles St, Baltimore",
 			"University of Delaware": "210 S College Ave, Newark, DE 19711",
-			"Baltimore City Community College": "2901 Liberty Heights Ave, Baltimore" }
+			"Baltimore City Community College": "2901 Liberty Heights Ave, Baltimore",
+			"St. Mary's College of Maryland": "47645 College Dr, St Marys City" }
 
 dests = { "BWI Departures": "7051 Friendship Rd, Baltimore",
 			"Boyfriend": "698 N Atlantic Ave, Ocean City",
@@ -94,7 +85,7 @@ destShort = { "Boyfriend": "698 N Atlantic Ave, Ocean City",
 			 "Brother's House": "2450 S Milledge Ave, Athens",
 			 "Family": "85554 Blue Rdg Pkwy, Bedford" }
 
-
+quickAdd = { "St. Mary's College of Maryland": "47645 College Dr, St Marys City" }
 
 
 
@@ -130,12 +121,10 @@ def get_geocode(address, name, attempt=1, maxAttempts=5):
 
 
 def get_data(startLoc, startName, endLoc, endName):
-	# startLoc = get_geocode(startPlace, startName)
-	# endLoc = get_geocode(endPlace, endName)
 
 	try:
-		startCoor = (startLoc.latitude, startLoc.longitude)
-		endCoor = (endLoc.latitude, endLoc.longitude)
+		# startCoor = (startLoc.latitude, startLoc.longitude)
+		# endCoor = (endLoc.latitude, endLoc.longitude)
 		startCoorFlip = (startLoc.longitude, startLoc.latitude)
 		endCoorFlip = (endLoc.longitude, endLoc.latitude)
 	except Exception as e:
@@ -143,7 +132,7 @@ def get_data(startLoc, startName, endLoc, endName):
 		return errmess
 
 	coors = (startCoorFlip, endCoorFlip)
-	res = client.directions(coors)
+	res = client.directions(coors)		
 
 	distance = round(res['routes'][0]['summary']['distance']/1609.34,1)
 	duration = round(res['routes'][0]['summary']['duration']/60,1)
@@ -171,13 +160,19 @@ def gen_map(startDict, endDict, focus, mapName):
 	colorDict = {}
 	startLen = 1
 	endLen = 1
+	requestCount = 0
 
 	for startName in startDict:
 		startLoc = get_geocode(startDict[startName],startName)
-		startLocs[startName] = startLoc
-		print("...added", startName, "to startLocs")
-		if len(startName) > startLen:
-			startLen = len(startName)
+		if "Error" in startLoc:
+			print(colors.red+endLoc+colors.endc)
+		else:
+			startLocs[startName] = startLoc
+			locLat= str(round(startLoc.latitude,5))[:7]
+			locLon = str(round(startLoc.longitude,5))[:7]
+			print("...added", "("+locLat+","+locLon+")", startName)
+			if len(startName) > startLen:
+				startLen = len(startName)
 
 
 	for endName in endDict:
@@ -186,7 +181,9 @@ def gen_map(startDict, endDict, focus, mapName):
 			print(colors.red+endLoc+colors.endc)
 		else:
 			endLocs[endName] = endLoc
-			print("...added", endName, "to endLocs")
+			locLat= str(round(endLoc.latitude,5))[:7]
+			locLon = str(round(endLoc.longitude,5))[:7]
+			print("...added", "("+locLat+","+locLon+")", endName)
 			if len(endName) > endLen:
 				endLen = len(endName)
 
@@ -200,8 +197,9 @@ def gen_map(startDict, endDict, focus, mapName):
 		m = folium.Map(location=(focusLoc.latitude, focusLoc.longitude),zoom_start=7, control_scale=True,tiles="cartodbpositron")
 		print("Generating Route Data for ", start)
 		for end in endLocs:
-			# Get Data
+			sleep(1)
 			dataOut = get_data(endLocs[end], end, startLocs[start], start)
+			
 			try:
 				coors, distance, duration = dataOut
 			except ValueError as e:
@@ -268,5 +266,14 @@ def gen_map(startDict, endDict, focus, mapName):
 		saveName = mapName+startName+".html"
 		m.save(saveName)
 
-gen_map(destShort, homeShort, center, "saved-maps/")
+gen_map(quickAdd, dests, center, "saved-maps/")
 
+
+
+			# Get Data
+			# if requestCount < 20:
+			# 	requestCount += 1
+			# else:
+			# 	print("sleeping...")
+			# 	sleep(5)
+			# 	requestCount = 1
