@@ -21,14 +21,18 @@ import csv
 import random
 import math
 from time import sleep
-from geopy.geocoders import Nominatim
-from geopy.exc import GeocoderTimedOut
-geolocator = Nominatim(user_agent="pyderweb")
+import json
+import folium
 
+from geopy.exc import GeocoderTimedOut
+from geopy.geocoders import GoogleV3
+# from geopy.geocoders import Nominatim
 import openrouteservice
 from openrouteservice import convert
-import folium
-import json
+
+geolocator = GoogleV3(api_key="INSERT_GOOGLE_MAPS_API_KEY_HERE")
+# geolocator = Nominatim(user_agent="pyderweb")
+client = openrouteservice.Client(key='INSERT_OPENROUTESERVICE_API_KEY_HERE')
 
 class colors:
     purple = '\033[95m'
@@ -52,7 +56,6 @@ class colors:
 # 	  colors.underline, "underline",
 # 	  colors.endc)
 
-client = openrouteservice.Client(key='INSERT_OPENROUTESERVICE_API_KEY_HERE')
 testcoors = ((80.21787585263182,6.025423265401452),(80.23990263756545,6.018498276842677))
 testres = client.directions(testcoors)
 
@@ -91,10 +94,7 @@ destShort = { "Boyfriend": "698 N Atlantic Ave, Ocean City",
 			 "Brother's House": "2450 S Milledge Ave, Athens",
 			 "Family": "85554 Blue Rdg Pkwy, Bedford" }
 
-center = dests["BWI Departures"]
 
-destLocs = {}
-homeLocs = {}
 
 
 
@@ -155,48 +155,60 @@ def get_data(startLoc, startName, endLoc, endName):
 	# 	f.write(json.dumps(res,indent=4, sort_keys=True))
 
 
-# Get focus point of map
-def gen_map(destDict, homeDict, focus, mapName):
+center = dests["BWI Departures"]
+
+def gen_map(startDict, endDict, focus, mapName):
+	# Get centerpoint of map
 	focusLoc = get_geocode(focus, focus+" (CENTER)")
 	if "Error" in focusLoc:
 		print(colors.red+focusLoc+colors.endc)
 		return
+	else:
+		print("Center Located", "("+focus+")")
 
-	destLen = 1
-	homeLen = 1
-
-	for destName in destDict:
-		destLoc = get_geocode(destDict[destName],destName)
-		destLocs[destName] = destLoc
-		print("...added", destName, "to destLocs")
-		if len(destName) > destLen:
-			destLen = len(destName)
-
-
-	for homeName in homeDict:
-		homeLoc = get_geocode(homeDict[homeName],homeName)
-		if "Error" in homeLoc:
-			print(colors.red+homeLoc+colors.endc)
-		else:
-			homeLocs[homeName] = homeLoc
-			print("...added", homeName, "to homeLocs")
-			if len(homeName) > homeLen:
-				homeLen = len(homeName)
-
-	# Generate Map
+	startLocs = {}
+	endLocs = {}
 	colorDict = {}
-	for home in homeLocs:
-		cVals = random.choices(range(256), k=3)
-		homeColor = "rgb("+str(cVals[0])+","+str(cVals[1])+","+str(cVals[2])+")"
-		colorDict[home] = homeColor
-	
-	for dest in destLocs:
-		m = folium.Map(location=(focusLoc.latitude, focusLoc.longitude),zoom_start=10, control_scale=True,tiles="cartodbpositron")
-		for home in homeLocs:
-			# Get Data
-			coors, distance, duration = get_data(homeLocs[home], home, destLocs[dest], dest)
+	startLen = 1
+	endLen = 1
 
-			# Convert Time to Human-Readable
+	for startName in startDict:
+		startLoc = get_geocode(startDict[startName],startName)
+		startLocs[startName] = startLoc
+		print("...added", startName, "to startLocs")
+		if len(startName) > startLen:
+			startLen = len(startName)
+
+
+	for endName in endDict:
+		endLoc = get_geocode(endDict[endName],endName)
+		if "Error" in endLoc:
+			print(colors.red+endLoc+colors.endc)
+		else:
+			endLocs[endName] = endLoc
+			print("...added", endName, "to endLocs")
+			if len(endName) > endLen:
+				endLen = len(endName)
+
+	for end in endLocs:
+		cVals = random.choices(range(256), k=3)
+		endColor = "rgb("+str(cVals[0])+","+str(cVals[1])+","+str(cVals[2])+")"
+		colorDict[end] = endColor
+	
+	# Generate Maps
+	for start in startLocs:
+		m = folium.Map(location=(focusLoc.latitude, focusLoc.longitude),zoom_start=7, control_scale=True,tiles="cartodbpositron")
+		print("Generating Route Data for ", start)
+		for end in endLocs:
+			# Get Data
+			dataOut = get_data(endLocs[end], end, startLocs[start], start)
+			try:
+				coors, distance, duration = dataOut
+			except ValueError as e:
+				print(dataOut)
+				break
+				
+			# Convert Time to Human-Readable Format
 			hours = math.floor(duration / 60)
 			mins = round(duration % 60)
 			if hours > 0 and mins > 0:
@@ -209,26 +221,24 @@ def gen_map(destDict, homeDict, focus, mapName):
 				humanTime = "(n/a)"
 
 			# Fix Margins on Terminal Output Text
-			homeMargin = " " * ( homeLen - len(home) )
-			destMargin = " " * ( destLen - len(dest) )
-			print(dest, destMargin, "<--", home, homeMargin, distance, "miles", "("+humanTime+")")
+			endMargin = " " * ( endLen - len(end) )
+			startMargin = " " * ( startLen - len(start) )
+			print(start, startMargin, "<--", end, endMargin, distance, "miles", "("+humanTime+")")
 
 			geometry = client.directions(coors)['routes'][0]['geometry']
 			decoded = convert.decode_polyline(geometry)
 
-			routeName = home+" --> "+dest
+			routeName = end+" --> "+start
 
 			labeltxt = "<b><strong>"+routeName+"</strong></b></br>"
 			distancetxt = "<b><strong>"+str(distance)+" miles </strong></b></br>"
 			durationtxt = "<b><strong>"+str(duration)+" mins</strong></b>"
 
 
-			routeColor = colorDict[home]
-			# print(routeColor)
+			routeColor = colorDict[end]
 
 			fillColor = routeColor
 			color = routeColor
-			# routeStyle = {'fillColor': routeColor, 'color': routeColor } # {'fillColor': '#00FFFFFF', 'color': '#00FFFFFF'} {'fillColor': '#228B22', 'color': '#228B22'}
 
 			folium.GeoJson(
 				decoded,
@@ -241,169 +251,22 @@ def gen_map(destDict, homeDict, focus, mapName):
 
 			folium.Marker(
 				location=list(coors[0][::-1]),
-				popup=home,
+				popup=end,
 				icon=folium.Icon(color="green"),
 			).add_to(m)
 
 			folium.Marker(
 				location=list(coors[1][::-1]),
-				popup=dest,
+				popup=start,
 				icon=folium.Icon(color="red"),
 			).add_to(m)
-
-			# print(colors.purple+home+colors.endc+" to "+colors.cyan+dest+colors.endc+" added to "+mapName)
 			
-		destName = dest.replace(" ", "-")
-		destName = destName.replace(".", "")
-		destName = destName.replace(",", "")
-		destName = destName.replace("'", "")
-		saveName = mapName+destName+".html"
+		startName = start.replace(" ", "-")
+		startName = startName.replace(".", "")
+		startName = startName.replace(",", "")
+		startName = startName.replace("'", "")
+		saveName = mapName+startName+".html"
 		m.save(saveName)
 
-gen_map(destShort, homeShort, center, "")
+gen_map(destShort, homeShort, center, "saved-maps/")
 
-		# else:
-		# 	print(destName, "<-----", homeName+":", "<<< ERROR [unknown]: ", str(e), ">>>")
-
-# for homePlace,homeName in umd:
-# 	get_geocode(homePlace,homeName)
-
-			# print(homeName+":",type(homeLoc))
-			# print(homePlace, homeName, "----->", destPlace, destName)
-
-
-# humanTime = str(math.floor(duration / 60)+"hrs, "+str(duration % 60)+"mins")
-
-# print("Distance:", distance, "miles,", humanTime)
-
-
-# # Generate Map
-# distance_txt = "<h4> <b>Distance :&nbsp" + "<strong>"+str(distance)+" Km </strong>" +"</h4></b>"
-# duration_txt = "<h4> <b>Duration :&nbsp" + "<strong>"+str(duration)+" Mins. </strong>" +"</h4></b>"
-
-# m = folium.Map(location=startCoor,zoom_start=5, control_scale=True,tiles="cartodbpositron")
-
-# folium.GeoJson(decoded).add_child(folium.Popup(distance_txt+duration_txt,max_width=300)).add_to(m)
-
-# folium.Marker(
-# 	location=list(coors[0][::-1]),
-# 	popup="Home",
-# 	icon=folium.Icon(color="green"),
-# ).add_to(m)
-
-# folium.Marker(
-# 	location=list(coors[1][::-1]),
-# 	popup="Dest",
-# 	icon=folium.Icon(color="red"),
-# ).add_to(m)
-
-
-# m.save('map-rw.html')
-
-
-
-
-
-
-# coors = ((39.95285175,-75.19578558111155),(38.61995497051513,-75.10309938399392))
-# res = client.directions(coors)
-
-
-# with(open('test-ex3.json','+w')) as f:
-# 	f.write(json.dumps(testres,indent=4, sort_keys=True))
-
-
-
-
-
-# for homePlace,homeName in umd:
-# 	for destPlace,destName in destShort:
-# 		# print(homePlace, homeName, "----->", destPlace, destName)
-# 		get_route(homePlace, homeName, destPlace, destName)
-
-
-# coors = ((int(startLoc.latitude), int(startLoc.longitude)), (int(endLoc.latitude), int(endLoc.longitude)))
-
-
-
-# cat list-scratch | while read -r line; do echo $line | sed 's|^\(.*[(]\)\(".*"\)\(, \)\(".*"\)\(.*\)|\1\4\3\2\5|g' ; done
-
-# homeList = [ ("101 Sanford Dr, Athens", "University of Georgia"),
-# 			("1200 N Dupont Hwy, Dover", "Delaware State University"),
-# 			("3620 Walnut Street, Philadelphia", "University of Pennsylvania"),
-# 			("620 W Lexington St, College Park", "University of Maryland"),
-# 			("8000 York Rd, Towson", "Towson University"),
-# 			("3101 Wyman Park Drive, Baltimore", "Johns Hopkins University"),
-# 			("14000 Jericho Park Rd, Bowie", "Bowie State University"),
-# 			("4501 N. Charles Street, Baltimore", "Loyola University Maryland"),
-# 			("4701 N Charles St, Baltimore", "Notre Dame of Maryland University"),
-# 			("1700 E Cold Spring Ln, Baltimore", "Morgan State University"),
-# 			("2500 W North Ave, Baltimore", "Coppin State University"),
-# 			("1300 W Mount Royal Ave, Baltimore", "Maryland Institute College of Art"),
-# 			("1021 Dulaney Valley Rd, Baltimore", "Goucher College"),
-# 			("60 College Ave, Annapolis", "St. John's College"),
-# 			("121 Blake Rd, Annapolis", "United States Naval Academy"),
-# 			("11301 Springfield Rd, Laurel", "Capitol Technology University"),
-# 			("1000 Hilltop Circle, Baltimore", "University of Maryland, Baltimore County"),
-# 			("1420 N Charles St, Baltimore", "University of Baltimore"),
-# 			("210 S College Ave, Newark, DE 19711", "University of Delaware"),
-# 			("2901 Liberty Heights Ave, Baltimore", "Baltimore City Community College") ]
-
-# destList = [ ("7051 Friendship Rd, Baltimore", "BWI Departures"),
-# 			("698 N Atlantic Ave, Ocean City", "Boyfriend"),
-# 			("2450 S Milledge Ave, Athens", "Brother's House"),
-# 			("85554 Blue Rdg Pkwy, Bedford", "Family") ]
-
-# homeShort = [ ("801 College Rd, Dover", "Delaware State University"),
-# 			("3620 Walnut Street, Philadelphia", "University of Pennsylvania"),
-# 			("7999 Regents Dr, College Park", "University of Maryland"),
-# 			("1420 N Charles St, Baltimore", "University of Baltimore") ]
-
-# destShort = [ ("698 N Atlantic Ave, Ocean City", "Boyfriend"),
-# 			("2450 S Milledge Ave, Athens", "Brother's House"),
-# 			("85554 Blue Rdg Pkwy, Bedford", "Family") ]
-
-# hPlace,hName = ("3620 Walnut Street, Philadelphia", "University of Pennsylvania")
-# dPlace,dName = ("698 N Atlantic Ave, Ocean City", "Boyfriend")
-
-# umd = [ ("620 W Lexington St, College Park", "University of Maryland") ]
-# upa = [ ("3620 Walnut Street, Philadelphia", "University of Pennsylvania") ]
-
-
-
-
-
-
-# timeList = [ ("3620 Walnut Street, Philadelphia", "University of Pennsylvania"),
-# 			("8000 York Rd, Towson", "Towson University"),
-# 			("4701 N Charles St, Baltimore", "Notre Dame of Maryland University"),
-# 			("2500 W North Ave, Baltimore", "Coppin State University"),
-# 			("11301 Springfield Rd, Laurel", "Capitol Technology University") ]
-
-# homeList = [ "University of Georgia Chapel, Herty Dr, Athens, GA 30602",
-# 			"1200 N Dupont Hwy, Dover, DE 19901",
-# 			"3620 Walnut Street, Philadelphia, PA 19104",
-# 			"620 W Lexington St, Baltimore, MD 21201",
-# 			"8000 York Rd, Towson, MD 21252",
-# 			"3101 Wyman Park Drive, Baltimore, MD 21218",
-# 			"14000 Jericho Park Rd, Bowie, MD 20715",
-# 			"4501 N. Charles Street, Baltimore, MD 21210",
-# 			"4701 N Charles St, Baltimore, MD 21210",
-# 			"1700 E Cold Spring Ln, Baltimore, MD 21251",
-# 			"2500 W North Ave, Baltimore, MD 21216",
-# 			"1300 W Mount Royal Ave, Baltimore, MD 21217",
-# 			"1021 Dulaney Valley Rd, Baltimore, MD 21204",
-# 			"60 College Ave, Annapolis, MD 21401",
-# 			"121 Blake Rd, Annapolis, MD 21402",
-# 			"11301 Springfield Rd, Laurel, MD 20708",
-# 			"1000 Hilltop Circle, Baltimore, MD 21250",
-# 			"1420 N Charles St, Baltimore, MD 21202",
-# 			"2901 Liberty Heights Ave, Baltimore, MD 21215",
-#			"210 S College Ave, Newark, DE 19711" ]
-
-# destList = [ "7051 Friendship Rd, Baltimore, MD 21240",
-# 			"698 N Atlantic Ave, Ocean City, MD 21842",
-# 			"2450 S Milledge Ave, Athens, MD 20636",
-# 			"85554 Blue Rdg Pkwy, Bedford, PA 18508" ]
-			
-#			North Dupont Highway, Dover, Kent County, Delaware, 19901, United States
