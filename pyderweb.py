@@ -109,7 +109,6 @@ destShort = {
 	"Family": "85554 Blue Rdg Pkwy, Bedford"
 	}
 
-quickAdd = { "St. Mary's College of Maryland": "47645 College Dr, St Marys City" }
 
 def filename_formatter(name):
 	fileName = name.replace(" ", "-")
@@ -290,8 +289,17 @@ def get_routes(startDict, endDict, saveJsons="None", saveCSV="None", saveMap="No
 	if saveCSV != "None":
 		table.to_csv(saveCSV+".csv")
 
-get_routes(homeShort, destShort, saveCSV="test")
+def quick_add(name, address, existDict, type="start", saveJsons="None", saveCSV="None", saveMap="None"):
+	addDict = { name: address }
+	if type == "start":
+		get_routes(addDict, existDict, saveJsons=saveJsons, saveCSV=saveCSV, saveMap=saveMap)
+	elif type == "end":
+		get_routes(existDict, addDict, saveJsons=saveJsons, saveCSV=saveCSV, saveMap=saveMap)
+	else:
+		print("Quick_Add() Error: type \""+type+"\" not understood. Please specify type as either \"start\" or \"end\" only.")
 
+# get_routes(homeShort, destShort, saveCSV="test")
+quick_add("St. Mary's College of Maryland", "47645 College Dr, St Marys City", destShort, saveCSV="quickTest")
 
 
 # testcoors = ((80.21787585263182,6.025423265401452),(80.23990263756545,6.018498276842677))
