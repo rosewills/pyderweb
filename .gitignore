@@ -3,3 +3,4 @@
 # Rose's test files (should not exist in public Github remote repo)
 rw-*
 rw/*
+test-saves/*

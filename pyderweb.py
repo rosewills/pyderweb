@@ -65,50 +65,15 @@ class colors:
     underline = '\033[4m'
     endc = '\033[0m'
 
-homes = {
-	"University of Georgia": "101 Sanford Dr, Athens",
-	"Delaware State University": "1200 N Dupont Hwy, Dover",
-	"University of Pennsylvania": "3620 Walnut Street, Philadelphia",
-	"University of Maryland": "620 W Lexington St, College Park",
-	"Towson University": "8000 York Rd, Towson",
-	"Johns Hopkins University": "3101 Wyman Park Drive, Baltimore",
-	"Bowie State University": "14000 Jericho Park Rd, Bowie",
-	"Loyola University Maryland": "4501 N. Charles Street, Baltimore",
-	"Notre Dame of Maryland University": "4701 N Charles St, Baltimore",
-	"Morgan State University": "1700 E Cold Spring Ln, Baltimore",
-	"Coppin State University": "2500 W North Ave, Baltimore",
-	"Maryland Institute College of Art": "1300 W Mount Royal Ave, Baltimore",
-	"Goucher College": "949 Dulaney Valley Rd, Baltimore",
-	"St. John's College": "60 College Ave, Annapolis",
-	"United States Naval Academy": "121 Blake Rd, Annapolis",
-	"Capitol Technology University": "11301 Springfield Rd, Laurel",
-	"University of Maryland, Baltimore County": "1000 Hilltop Circle, Baltimore",
-	"University of Baltimore": "1420 N Charles St, Baltimore",
-	"University of Delaware": "210 S College Ave, Newark, DE 19711",
-	"Baltimore City Community College": "2901 Liberty Heights Ave, Baltimore",
-	"St. Mary's College of Maryland": "47645 College Dr, St Marys City"
-	}
+homes = pd.read_csv("rw/rw-homes.csv", sep="\t", index_col="name")
+dests = pd.read_csv("rw/rw-dests.csv", sep="\t", index_col="name")
 
-dests = {
-	"BWI Departures": "7051 Friendship Rd, Baltimore",
-	"Boyfriend": "698 N Atlantic Ave, Ocean City",
-	"Brother's House": "2450 S Milledge Ave, Athens",
-	"Family": "85554 Blue Rdg Pkwy, Bedford"
-	}
+# print(homes['address'])
+# print(dests['address'])
 
-homeShort = {
-	"Delaware State University": "801 College Rd, Dover",
-	"University of Pennsylvania": "3620 Walnut Street, Philadelphia",
-	"University of Maryland": "7999 Regents Dr, College Park",
-	"University of Baltimore": "1420 N Charles St, Baltimore"
-	}
 
-destShort = {
-	"Boyfriend": "698 N Atlantic Ave, Ocean City",
-	"Brother's House": "2450 S Milledge Ave, Athens",
-	"Family": "85554 Blue Rdg Pkwy, Bedford"
-	}
-
+homeShort = pd.read_csv("rw/rw-homes-test.csv", index_col=0, sep="\t")
+destShort = pd.read_csv("rw/rw-dests-test.csv", index_col=0, sep="\t")
 
 def filename_formatter(name):
 	fileName = name.replace(" ", "-")
@@ -166,7 +131,7 @@ def get_data(startLoc, endLoc, saveJson="None"):
 
 
 
-def get_routes(startDict, endDict, saveJsons="None", saveCSV="None", saveMap="None"):
+def get_routes(dfStart, dfEnd, saveJsons="None", saveCSV="None", saveMap="None"):
 
 	startLocs = {}
 	endLocs = {}
@@ -174,10 +139,10 @@ def get_routes(startDict, endDict, saveJsons="None", saveCSV="None", saveMap="No
 	startLen = 1
 	endLen = 1
 
-	table = pd.DataFrame(index = startDict.keys())
+	table = pd.DataFrame(index = dfStart.index)
 
-	for startName in startDict:
-		startLoc = get_geocode(startDict[startName],startName)
+	for startName,info in dfStart.iterrows():
+		startLoc = get_geocode(info["address"],startName)
 		if "Error" in startLoc:
 			print(colors.red+endLoc+colors.endc)
 		else:
@@ -188,8 +153,8 @@ def get_routes(startDict, endDict, saveJsons="None", saveCSV="None", saveMap="No
 			if len(startName) > startLen:
 				startLen = len(startName)
 
-	for endName in endDict:
-		endLoc = get_geocode(endDict[endName],endName)
+	for endName,info in dfEnd.iterrows():
+		endLoc = get_geocode(info["address"],endName)
 		if "Error" in endLoc:
 			print(colors.red+endLoc+colors.endc)
 		else:
@@ -289,17 +254,24 @@ def get_routes(startDict, endDict, saveJsons="None", saveCSV="None", saveMap="No
 	if saveCSV != "None":
 		table.to_csv(saveCSV+".csv")
 
-def quick_add(name, address, existDict, type="start", saveJsons="None", saveCSV="None", saveMap="None"):
-	addDict = { name: address }
+def quick_add(dfAdd, dfExist, type="start", saveJsons="None", saveCSV="None", saveMap="None"):
 	if type == "start":
-		get_routes(addDict, existDict, saveJsons=saveJsons, saveCSV=saveCSV, saveMap=saveMap)
+		get_routes(dfAdd, dfExist, saveJsons=saveJsons, saveCSV=saveCSV, saveMap=saveMap)
 	elif type == "end":
-		get_routes(existDict, addDict, saveJsons=saveJsons, saveCSV=saveCSV, saveMap=saveMap)
+		get_routes(dfExist, dfAdd, saveJsons=saveJsons, saveCSV=saveCSV, saveMap=saveMap)
 	else:
 		print("Quick_Add() Error: type \""+type+"\" not understood. Please specify type as either \"start\" or \"end\" only.")
 
+
+
 # get_routes(homeShort, destShort, saveCSV="test")
-quick_add("St. Mary's College of Maryland", "47645 College Dr, St Marys City", destShort, saveCSV="quickTest")
+
+quickDict = {
+	"St. Mary's College of Maryland": "47645 College Dr, St Marys City"
+}
+dfQuick = pd.DataFrame.from_dict(quickDict, orient='index', columns=['address'])
+
+quick_add(dfQuick, destShort, saveCSV="quickTest")
 
 
 # testcoors = ((80.21787585263182,6.025423265401452),(80.23990263756545,6.018498276842677))
