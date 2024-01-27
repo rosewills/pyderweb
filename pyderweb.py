@@ -36,45 +36,78 @@ This script is currently a work-in-progress.
 
 '''
 
+# IMPORTS #
+###########
+# Basic Functions
 import re				# regex support
-import random			# used to generate random colors for plotting routes
-import math				# used to present 
-from time import sleep
-import json
-import pandas as pd
-import folium
+import random			# generates random colors for plotting routes on maps
+import math				# used when converting time to human-readable format
+from time import sleep	# prevents flooding openrouteservice server with requests
 
-from geopy.exc import GeocoderTimedOut
-# from geopy.geocoders import Nominatim
-from geopy.geocoders import GoogleV3
-import openrouteservice
-from openrouteservice import convert
+# Data & Files
+import pandas as pd		# reading in and working with dataframes
+import folium			# generates maps
+import json				# saves json files
 
-# geolocator = Nominatim(user_agent="pyderweb")
-geolocator = GoogleV3(api_key="INSERT_GOOGLE_MAPS_API_KEY_HERE")
-client = openrouteservice.Client(key='INSERT_OPENROUTESERVICE_API_KEY_HERE')
+# Geospatial Info
+import openrouteservice					# Gets shortest route between two locations
+from openrouteservice import convert	# decodes route data from openstreetmap for folium to interpret
+from geopy.exc import GeocoderTimedOut	# handles errors due to geocoder taking too long to find a match
 
+# [NOTE] Choose your preferred Geocoder below (by uncommenting it)
+#from geopy.geocoders import Nominatim	# Geocoder (Open-Source Option) - uses Openstreetmap
+from geopy.geocoders import GoogleV3	# Geocoder (Proprietary Option) - uses Google Maps API
+
+
+
+# GLOBAL VARIABLES #
+####################
+# [NOTE] Choose the geolocator below that matches your geocoder (remember to update any API key fields to with your own key)
+# geolocator = Nominatim(user_agent="pyderweb")								# user_agent= field is arbitrary; can change if you like
+geolocator = GoogleV3(api_key="INSERT_GOOGLE_MAPS_API_KEY_HERE")	# Update api_key= field with your own Google Maps API key 
+																			# Google Maps API keys are available here: https://developers.google.com/maps
+
+client = openrouteservice.Client(key='INSERT_OPENROUTESERVICE_API_KEY_HERE')	# Update key= field with your own Openrouteservice API key
+																									# Openrouteservice API keys are available (for free!) here: https://openrouteservice.org/plans/
+
+# [Optional] Pretty Colors for Terminal Output (Bash-specific)
 class colors:
-    purple = '\033[95m'
-    blue = '\033[94m'
-    cyan = '\033[96m'
-    green = '\033[92m'
-    yellow = '\033[93m'
-    red = '\033[91m'
-    bold = '\033[1m'
-    underline = '\033[4m'
-    endc = '\033[0m'
-
-homes = pd.read_csv("rw/rw-homes.csv", sep="\t", index_col="name")
-dests = pd.read_csv("rw/rw-dests.csv", sep="\t", index_col="name")
-
-# print(homes['address'])
-# print(dests['address'])
+	purple = '\033[95m'
+	blue = '\033[94m'
+	cyan = '\033[96m'
+	green = '\033[92m'
+	yellow = '\033[93m'
+	red = '\033[91m'
+	bold = '\033[1m'
+	underline = '\033[4m'
+	endc = '\033[0m'
 
 
-homeShort = pd.read_csv("rw/rw-homes-test.csv", index_col=0, sep="\t")
-destShort = pd.read_csv("rw/rw-dests-test.csv", index_col=0, sep="\t")
+# INPUT DATA #
+##############
+# Read in CSV Files
+homes = pd.read_csv("homes-demo.csv",		# csv file listing potential home names & addresses
+					sep=",",				# character used to delimit columns
+					quotechar='"',			# character used to quote strings
+					skipinitialspace=True,	# True if a space is added after each column delimiter
+					index_col="name")		# Name of column to be used as row labels
 
+dests = pd.read_csv("dests-demo.csv",		# csv file listing potential destination names & addresses
+					sep=",",				# character used to delimit columns
+					quotechar='"',			# character used to quote strings
+					skipinitialspace=True,	# True if a space is added after each column delimiter
+					index_col="name")		# Name of column to be used as row labels
+
+# Quick-Add Option
+quickDict = {
+	"St. Mary's College of Maryland": "47645 College Dr, St Marys City"
+}
+
+dfQuick = pd.DataFrame.from_dict(quickDict, orient='index', columns=['address'])
+
+# FUNCTIONS #
+#############
+# [TEMPORARY HACK] Format labels for use in filenames ([to-fix] - there are better ways to do this)
 def filename_formatter(name):
 	fileName = name.replace(" ", "-")
 	fileName = fileName.replace(".", "")
@@ -82,7 +115,7 @@ def filename_formatter(name):
 	fileName = fileName.replace("'", "")
 	return fileName
 
-
+# Fetch Geocode
 def get_geocode(address, name, attempt=1, maxAttempts=5):
 	try:
 		location = geolocator.geocode(address)
@@ -106,8 +139,8 @@ def get_geocode(address, name, attempt=1, maxAttempts=5):
 		return errmess
 	
 
-
-def get_data(startLoc, endLoc, saveJson="None"):
+# Fetch Route Data
+def get_route(startLoc, endLoc, saveJson="None"):
 	try:
 		startCoorFlip = (startLoc.longitude, startLoc.latitude)
 		endCoorFlip = (endLoc.longitude, endLoc.latitude)
@@ -130,9 +163,8 @@ def get_data(startLoc, endLoc, saveJson="None"):
 	return coors, distance, duration
 
 
-
-def get_routes(dfStart, dfEnd, saveJsons="None", saveCSV="None", saveMap="None"):
-
+# Generate Results & Save Output Files
+def get_data(dfStart, dfEnd, saveJsons="None", saveCSV="None", saveMap="None"):
 	startLocs = {}
 	endLocs = {}
 	colorDict = {}
@@ -180,9 +212,9 @@ def get_routes(dfStart, dfEnd, saveJsons="None", saveCSV="None", saveMap="None")
 		for end in endLocs:
 			sleep(1)
 			if saveJsons != "None":
-				dataOut = get_data(endLocs[end], startLocs[start], saveJson=saveJsons+filename_formatter(start)+"-"+filename_formatter(end))
+				dataOut = get_route(endLocs[end], startLocs[start], saveJson=saveJsons+filename_formatter(start)+"-"+filename_formatter(end))
 			else:
-				dataOut = get_data(endLocs[end], startLocs[start])
+				dataOut = get_route(endLocs[end], startLocs[start])
 			try:
 				coors, distance, duration = dataOut
 			except ValueError as e:
@@ -254,25 +286,18 @@ def get_routes(dfStart, dfEnd, saveJsons="None", saveCSV="None", saveMap="None")
 	if saveCSV != "None":
 		table.to_csv(saveCSV+".csv")
 
+
+# Quickly Get Data for One Home/Destination
 def quick_add(dfAdd, dfExist, type="start", saveJsons="None", saveCSV="None", saveMap="None"):
 	if type == "start":
-		get_routes(dfAdd, dfExist, saveJsons=saveJsons, saveCSV=saveCSV, saveMap=saveMap)
+		get_data(dfAdd, dfExist, saveJsons=saveJsons, saveCSV=saveCSV, saveMap=saveMap)
 	elif type == "end":
-		get_routes(dfExist, dfAdd, saveJsons=saveJsons, saveCSV=saveCSV, saveMap=saveMap)
+		get_data(dfExist, dfAdd, saveJsons=saveJsons, saveCSV=saveCSV, saveMap=saveMap)
 	else:
 		print("Quick_Add() Error: type \""+type+"\" not understood. Please specify type as either \"start\" or \"end\" only.")
 
 
-
-# get_routes(homeShort, destShort, saveCSV="test")
-
-quickDict = {
-	"St. Mary's College of Maryland": "47645 College Dr, St Marys City"
-}
-dfQuick = pd.DataFrame.from_dict(quickDict, orient='index', columns=['address'])
-
-quick_add(dfQuick, destShort, saveCSV="quickTest")
+#quick_add(dfQuick, dests, saveCSV="quickTest")
+get_data(homes, dests, saveCSV="demo-output/demo", saveMap="demo-output/demo_")
 
 
-# testcoors = ((80.21787585263182,6.025423265401452),(80.23990263756545,6.018498276842677))
-# testres = client.directions(testcoors)
