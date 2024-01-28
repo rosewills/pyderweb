@@ -55,31 +55,38 @@ from openrouteservice import convert	# decodes route data from openstreetmap for
 from geopy.exc import GeocoderTimedOut	# handles errors due to geocoder taking too long to find a match
 
 # [NOTE] Choose your preferred Geocoder below (by uncommenting it)
-#from geopy.geocoders import Nominatim	# Geocoder (Open-Source Option) - uses Openstreetmap
-from geopy.geocoders import GoogleV3	# Geocoder (Proprietary Option) - uses Google Maps API
+from geopy.geocoders import Nominatim			# Geocoder (Open-Source Option) - uses Openstreetmap
+# from geopy.geocoders import GoogleV3			# Geocoder (Proprietary Option) - uses Google Maps API
+
+
+keys = pd.read_csv("rw/rw-apikeys.csv",		# csv file listing personal api keys
+					sep=",",				# character used to delimit columns
+					quotechar='"',			# character used to quote strings
+					skipinitialspace=True,	# True if a space is added after each column delimiter
+					index_col="service")	# Name of column to be used as row labels
+keyCol = "key"
 
 
 
 # GLOBAL VARIABLES #
 ####################
 # [NOTE] Choose the geolocator below that matches your geocoder (remember to update any API key fields to with your own key)
-# geolocator = Nominatim(user_agent="pyderweb")								# user_agent= field is arbitrary; can change if you like
-geolocator = GoogleV3(api_key="INSERT_GOOGLE_MAPS_API_KEY_HERE")	# Update api_key= field with your own Google Maps API key 
-																			# Google Maps API keys are available here: https://developers.google.com/maps
+geolocator = Nominatim(user_agent="pyderweb")	# user_agent= field is arbitrary; can change if you like
+# geolocator = GoogleV3(api_key='INSERT_GOOGLE_MAPS_API_KEY_HERE')	# Update api_key= field with your own Google Maps API key 
+																	# Google Maps API keys are available here: https://developers.google.com/maps
+# geolocator = GoogleV3(api_key=keys.at["GoogleV3", keyCol])
 
-client = openrouteservice.Client(key='INSERT_OPENROUTESERVICE_API_KEY_HERE')	# Update key= field with your own Openrouteservice API key
-																									# Openrouteservice API keys are available (for free!) here: https://openrouteservice.org/plans/
+# client = openrouteservice.Client(key='INSERT_OPENROUTESERVICE_API_KEY_HERE')	# Update key= field with your own Openrouteservice API key
+client = openrouteservice.Client(key=keys.at["openrouteservice", keyCol])	# Update key= field with your own Openrouteservice API key
+																				# Openrouteservice API keys are available (for free!) here: https://openrouteservice.org/plans/
 
-# [Optional] Pretty Colors for Terminal Output (Bash-specific)
+# [Optional] Pretty Colors for Terminal Errors (Bash-specific)
 class colors:
-	purple = '\033[95m'
-	blue = '\033[94m'
-	cyan = '\033[96m'
 	green = '\033[92m'
+	blue = '\033[94m'
 	yellow = '\033[93m'
 	red = '\033[91m'
 	bold = '\033[1m'
-	underline = '\033[4m'
 	endc = '\033[0m'
 
 
@@ -171,32 +178,60 @@ def get_data(dfStart, dfEnd, saveJsons="None", saveCSV="None", saveMap="None"):
 	startLen = 1
 	endLen = 1
 
+	totalStart = len(dfStart)
+	totalEnd = len(dfEnd)
+	startFail = 0
+	endFail = 0
+
 	table = pd.DataFrame(index = dfStart.index)
 
 	for startName,info in dfStart.iterrows():
 		startLoc = get_geocode(info["address"],startName)
-		if "Error" in startLoc:
-			print(colors.red+endLoc+colors.endc)
-		else:
-			startLocs[startName] = startLoc
-			locLat= str(round(startLoc.latitude,5))[:7]
-			locLon = str(round(startLoc.longitude,5))[:7]
-			print("...added", "("+locLat+","+locLon+")", startName)
-			if len(startName) > startLen:
-				startLen = len(startName)
+		try:
+			if "Error" in startLoc:
+				print(colors.red+startLoc+colors.endc)
+				raise Exception
+			else:
+				startLocs[startName] = startLoc
+				locLat= str(round(startLoc.latitude,5))[:7]
+				locLon = str(round(startLoc.longitude,5))[:7]
+				print("...added", "("+locLat+","+locLon+")", startName)
+				if len(startName) > startLen:
+					startLen = len(startName)
+		except:
+			print(colors.red+"Geocoder could not locate", startName, "(skipping)"+colors.endc)
+			startFail += 1
 
 	for endName,info in dfEnd.iterrows():
 		endLoc = get_geocode(info["address"],endName)
-		if "Error" in endLoc:
-			print(colors.red+endLoc+colors.endc)
-		else:
-			endLocs[endName] = endLoc
-			locLat= str(round(endLoc.latitude,5))[:7]
-			locLon = str(round(endLoc.longitude,5))[:7]
-			print("...added", "("+locLat+","+locLon+")", endName)
-			if len(endName) > endLen:
-				endLen = len(endName)
+		try:
+			if "Error" in endLoc:
+				print(colors.red+endLoc+colors.endc)
+				raise Exception
+			else:
+				endLocs[endName] = endLoc
+				locLat= str(round(endLoc.latitude,5))[:7]
+				locLon = str(round(endLoc.longitude,5))[:7]
+				print("...added", "("+locLat+","+locLon+")", endName)
+				if len(endName) > endLen:
+					endLen = len(endName)
+		except:
+			print(colors.red+"Geocoder could not locate", endName, "(skipping)"+colors.endc)
+			endFail += 1
+		
 
+	if startFail > 0 and endFail > 0:
+		print(colors.bold+colors.green+str(totalStart-startFail)+"/"+str(totalStart), "homes &", str(totalEnd-endFail)+"/"+str(totalEnd), "destinations located."+colors.endc)
+		print(colors.bold+colors.red+str(startFail), "homes &", str(endFail), "destinations skipped."+colors.endc)
+	elif startFail > 0:
+		print(colors.bold+colors.green+str(totalStart-startFail)+"/"+str(totalStart), "homes located. (All destinations found successfully.)"+colors.endc)
+		print(colors.bold+colors.red+str(startFail), "homes skipped."+colors.endc)
+	elif endFail > 0:
+		print(colors.bold+colors.green+str(totalStart-endFail)+"/"+str(totalEnd), "destinations located. (All homes found successfully.)"+colors.endc)
+		print(colors.bold+colors.red+str(endFail), "destinations skipped."+colors.endc)
+	else:
+		print(colors.bold+colors.green+"All locations found!"+colors.endc)
+	
 	for end in endLocs:
 		cVals = random.choices(range(256), k=3)
 		endColor = "rgb("+str(cVals[0])+","+str(cVals[1])+","+str(cVals[2])+")"
@@ -298,6 +333,6 @@ def quick_add(dfAdd, dfExist, type="start", saveJsons="None", saveCSV="None", sa
 
 
 #quick_add(dfQuick, dests, saveCSV="quickTest")
-get_data(homes, dests, saveCSV="demo-output/demo", saveMap="demo-output/demo_")
+get_data(homes, dests, saveCSV="demo-output/nomi", saveMap="demo-output/nomi_")
 
 
