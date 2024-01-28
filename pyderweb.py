@@ -155,8 +155,8 @@ def get_route(startLoc, endLoc, saveJson="None"):
 	distance = round(res['routes'][0]['summary']['distance']/1609.34,1)
 	duration = round(res['routes'][0]['summary']['duration']/60,1)
 	
+	# Save Route Data to .json File
 	if saveJson != "None":
-		# Save Route Data to .json File
 		with(open(saveJson+'.json','+w')) as f:
 			f.write(json.dumps(res,indent=4, sort_keys=True))
 	
