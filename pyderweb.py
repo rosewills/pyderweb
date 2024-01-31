@@ -55,10 +55,12 @@ from openrouteservice import convert	# decodes route data from openstreetmap for
 from geopy.exc import GeocoderTimedOut	# handles errors due to geocoder taking too long to find a match
 
 # [NOTE] Choose your preferred Geocoder below (by uncommenting it)
-from geopy.geocoders import Nominatim			# Geocoder (Open-Source Option) - uses Openstreetmap
-# from geopy.geocoders import GoogleV3			# Geocoder (Proprietary Option) - uses Google Maps API
+# from geopy.geocoders import Nominatim			# Geocoder (Open-Source Option) - uses Openstreetmap
+from geopy.geocoders import GoogleV3			# Geocoder (Proprietary Option) - uses Google Maps API
 
 
+# GLOBAL VARIABLES #
+####################
 keys = pd.read_csv("rw/rw-apikeys.csv",		# csv file listing personal api keys
 					sep=",",				# character used to delimit columns
 					quotechar='"',			# character used to quote strings
@@ -67,14 +69,11 @@ keys = pd.read_csv("rw/rw-apikeys.csv",		# csv file listing personal api keys
 keyCol = "key"
 
 
-
-# GLOBAL VARIABLES #
-####################
 # [NOTE] Choose the geolocator below that matches your geocoder (remember to update any API key fields to with your own key)
-geolocator = Nominatim(user_agent="pyderweb")	# user_agent= field is arbitrary; can change if you like
+# geolocator = Nominatim(user_agent="pyderweb")	# user_agent field is arbitrary; can change if you like
 # geolocator = GoogleV3(api_key='INSERT_GOOGLE_MAPS_API_KEY_HERE')	# Update api_key= field with your own Google Maps API key 
 																	# Google Maps API keys are available here: https://developers.google.com/maps
-# geolocator = GoogleV3(api_key=keys.at["GoogleV3", keyCol])
+geolocator = GoogleV3(api_key=keys.at["GoogleV3", keyCol])
 
 # client = openrouteservice.Client(key='INSERT_OPENROUTESERVICE_API_KEY_HERE')	# Update key= field with your own Openrouteservice API key
 client = openrouteservice.Client(key=keys.at["openrouteservice", keyCol])	# Update key= field with your own Openrouteservice API key
@@ -144,7 +143,34 @@ def get_geocode(address, name, attempt=1, maxAttempts=5):
 	except Exception as e:
 		errmess = colors.red+"ERROR [get_geocode]: unknown error >>> "+name+"\n\t"+colors.yellow+str(e)+colors.endc
 		return errmess
-	
+
+
+def store_geocode(df):
+	failcount = 0
+	nameLen = 0
+	gcDict = {}
+
+	for name,info in df.iterrows():
+		loc = get_geocode(info["address"],name)
+		try:
+			if "Error" in loc:
+				print(colors.red+loc+colors.endc)
+				raise Exception
+			else:
+				df.at[name, 'found'] = loc.address
+				gcDict[name] = loc
+				# df.at[name, 'data'] = loc
+				locLat= str(round(loc.latitude,5))[:7]
+				locLon = str(round(loc.longitude,5))[:7]
+				print("...added", "("+locLat+","+locLon+")", name)
+				if len(name) > nameLen:
+					nameLen = len(name)
+		except Exception as e:
+			print(str(e))
+			print(colors.red+"Geocoder could not locate", name, "(skipping)"+colors.endc)
+			failcount += 1
+	return df, gcDict, failcount, nameLen
+
 
 # Fetch Route Data
 def get_route(startLoc, endLoc, saveJson="None"):
@@ -172,53 +198,21 @@ def get_route(startLoc, endLoc, saveJson="None"):
 
 # Generate Results & Save Output Files
 def get_data(dfStart, dfEnd, saveJsons="None", saveCSV="None", saveMap="None"):
-	startLocs = {}
-	endLocs = {}
-	colorDict = {}
-	startLen = 1
-	endLen = 1
+	# startLocs = {}
+	# endLocs = {}
+	# colorDict = {}
+	# startLen = 1
+	# endLen = 1
 
 	totalStart = len(dfStart)
 	totalEnd = len(dfEnd)
-	startFail = 0
-	endFail = 0
+	# startFail = 0
+	# endFail = 0
 
 	table = pd.DataFrame(index = dfStart.index)
 
-	for startName,info in dfStart.iterrows():
-		startLoc = get_geocode(info["address"],startName)
-		try:
-			if "Error" in startLoc:
-				print(colors.red+startLoc+colors.endc)
-				raise Exception
-			else:
-				startLocs[startName] = startLoc
-				locLat= str(round(startLoc.latitude,5))[:7]
-				locLon = str(round(startLoc.longitude,5))[:7]
-				print("...added", "("+locLat+","+locLon+")", startName)
-				if len(startName) > startLen:
-					startLen = len(startName)
-		except:
-			print(colors.red+"Geocoder could not locate", startName, "(skipping)"+colors.endc)
-			startFail += 1
-
-	for endName,info in dfEnd.iterrows():
-		endLoc = get_geocode(info["address"],endName)
-		try:
-			if "Error" in endLoc:
-				print(colors.red+endLoc+colors.endc)
-				raise Exception
-			else:
-				endLocs[endName] = endLoc
-				locLat= str(round(endLoc.latitude,5))[:7]
-				locLon = str(round(endLoc.longitude,5))[:7]
-				print("...added", "("+locLat+","+locLon+")", endName)
-				if len(endName) > endLen:
-					endLen = len(endName)
-		except:
-			print(colors.red+"Geocoder could not locate", endName, "(skipping)"+colors.endc)
-			endFail += 1
-		
+	dfStart, sData, startFail, startLen = store_geocode(dfStart)
+	dfEnd, eData, endFail, endLen = store_geocode(dfEnd)
 
 	if startFail > 0 and endFail > 0:
 		print(colors.bold+colors.green+str(totalStart-startFail)+"/"+str(totalStart), "homes &", str(totalEnd-endFail)+"/"+str(totalEnd), "destinations located."+colors.endc)
@@ -232,24 +226,28 @@ def get_data(dfStart, dfEnd, saveJsons="None", saveCSV="None", saveMap="None"):
 	else:
 		print(colors.bold+colors.green+"All locations found!"+colors.endc)
 	
-	for end in endLocs:
+	for endName,info in dfEnd.iterrows():
 		cVals = random.choices(range(256), k=3)
 		endColor = "rgb("+str(cVals[0])+","+str(cVals[1])+","+str(cVals[2])+")"
-		colorDict[end] = endColor
+		print("color for", endName, endColor)
+		dfEnd.at[endName, 'color'] = endColor
 	
 	# Output Data Files
-	for start in startLocs:
+	for start,sInfo in dfStart.iterrows():
 		print("Generating Route Data for ", start)
 
 		if saveMap != "None":
-			m = folium.Map(location=(startLocs[start].latitude, startLocs[start].longitude),zoom_start=7, control_scale=True,tiles="cartodbpositron")
+			m = folium.Map(location=(sData[start].latitude, sData[start].longitude),zoom_start=7, control_scale=True,tiles="cartodbpositron")
+			# m = folium.Map(location=(sInfo['data'].latitude, sInfo['data'].longitude),zoom_start=7, control_scale=True,tiles="cartodbpositron")
 
-		for end in endLocs:
+		for end,eInfo in dfEnd.iterrows():
 			sleep(1)
 			if saveJsons != "None":
-				dataOut = get_route(endLocs[end], startLocs[start], saveJson=saveJsons+filename_formatter(start)+"-"+filename_formatter(end))
+				dataOut = get_route(eData[end], sData[start], saveJson=saveJsons+filename_formatter(start)+"-"+filename_formatter(end))
+				# dataOut = get_route(eInfo['data'], sInfo['data'], saveJson=saveJsons+filename_formatter(start)+"-"+filename_formatter(end))
 			else:
-				dataOut = get_route(endLocs[end], startLocs[start])
+				dataOut = get_route(eData[end], sData[start])
+				# dataOut = get_route(eInfo['data'], sInfo['data'])
 			try:
 				coors, distance, duration = dataOut
 			except ValueError as e:
@@ -289,7 +287,7 @@ def get_data(dfStart, dfEnd, saveJsons="None", saveCSV="None", saveMap="None"):
 				distancetxt = "<b><strong>"+str(distance)+" miles </strong></b></br>"
 				durationtxt = "<b><strong>"+str(humanTime)+"</strong></b>"
 
-				routeColor = colorDict[end]
+				routeColor = dfEnd.at[end, 'color']
 				fillColor = routeColor
 				color = routeColor
 
@@ -317,9 +315,16 @@ def get_data(dfStart, dfEnd, saveJsons="None", saveCSV="None", saveMap="None"):
 		if saveMap != "None":
 			mapFile = saveMap+filename_formatter(start)+".html"
 			m.save(mapFile)
+
 	print(table)
+
 	if saveCSV != "None":
-		table.to_csv(saveCSV+".csv")
+		dfStart.to_csv(saveCSV+"-homes.csv")
+		dfEnd.to_csv(saveCSV+"-dests.csv")
+		# csvHomes = dfStart.drop("data", axis=1, inplace=True)
+		# csvDests = dfEnd.drop("data", axis=1, inplace=True)
+		# csvHomes.to_csv(saveCSV+"-homes.csv")
+		# csvDests.to_csv(saveCSV+"-dests.csv")
 
 
 # Quickly Get Data for One Home/Destination
