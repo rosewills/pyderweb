@@ -46,21 +46,22 @@ from time import sleep	# prevents flooding openrouteservice server with requests
 
 # Data & Files
 import pandas as pd		# reading in and working with dataframes
+from shapely.geometry import Point
 import folium			# generates maps
 import json				# saves json files
 
 # Geospatial Info
+import geopandas as gpd
+from geopandas.tools import geocode
+from geopy.exc import GeocoderTimedOut	# handles errors due to geocoder taking too long to find a match
 import openrouteservice					# Gets shortest route between two locations
 from openrouteservice import convert	# decodes route data from openstreetmap for folium to interpret
-from geopy.exc import GeocoderTimedOut	# handles errors due to geocoder taking too long to find a match
-
-# [NOTE] Choose your preferred Geocoder below (by uncommenting it)
-# from geopy.geocoders import Nominatim			# Geocoder (Open-Source Option) - uses Openstreetmap
-from geopy.geocoders import GoogleV3			# Geocoder (Proprietary Option) - uses Google Maps API
 
 
-# GLOBAL VARIABLES #
-####################
+# GEOCODING & ROUTES #
+######################
+gcService = 'GoogleV3'
+
 keys = pd.read_csv("rw/rw-apikeys.csv",		# csv file listing personal api keys
 					sep=",",				# character used to delimit columns
 					quotechar='"',			# character used to quote strings
@@ -68,25 +69,21 @@ keys = pd.read_csv("rw/rw-apikeys.csv",		# csv file listing personal api keys
 					index_col="service")	# Name of column to be used as row labels
 keyCol = "key"
 
-
-# [NOTE] Choose the geolocator below that matches your geocoder (remember to update any API key fields to with your own key)
-# geolocator = Nominatim(user_agent="pyderweb")	# user_agent field is arbitrary; can change if you like
-# geolocator = GoogleV3(api_key='INSERT_GOOGLE_MAPS_API_KEY_HERE')	# Update api_key= field with your own Google Maps API key 
-																	# Google Maps API keys are available here: https://developers.google.com/maps
-geolocator = GoogleV3(api_key=keys.at["GoogleV3", keyCol])
+gcKey = keys.at[gcService, keyCol]
 
 # client = openrouteservice.Client(key='INSERT_OPENROUTESERVICE_API_KEY_HERE')	# Update key= field with your own Openrouteservice API key
 client = openrouteservice.Client(key=keys.at["openrouteservice", keyCol])	# Update key= field with your own Openrouteservice API key
 																				# Openrouteservice API keys are available (for free!) here: https://openrouteservice.org/plans/
 
-# [Optional] Pretty Colors for Terminal Errors (Bash-specific)
-class colors:
-	green = '\033[92m'
-	blue = '\033[94m'
-	yellow = '\033[93m'
-	red = '\033[91m'
-	bold = '\033[1m'
-	endc = '\033[0m'
+# [NOTE] Choose your preferred Geocoder below (by uncommenting it)
+# from geopy.geocoders import Nominatim			# Geocoder (Open-Source Option) - uses Openstreetmap
+# from geopy.geocoders import GoogleV3			# Geocoder (Proprietary Option) - uses Google Maps API
+
+# [NOTE] Choose the geolocator below that matches your geocoder (remember to update any API key fields to with your own key)
+# geolocator = Nominatim(user_agent="pyderweb")	# user_agent field is arbitrary; can change if you like
+# geolocator = GoogleV3(api_key='INSERT_GOOGLE_MAPS_API_KEY_HERE')	# Update api_key= field with your own Google Maps API key 
+																	# Google Maps API keys are available here: https://developers.google.com/maps
+# geolocator = GoogleV3(api_key=keys.at["GoogleV3", keyCol])
 
 
 # INPUT DATA #
@@ -111,8 +108,19 @@ quickDict = {
 
 dfQuick = pd.DataFrame.from_dict(quickDict, orient='index', columns=['address'])
 
+
 # FUNCTIONS #
 #############
+
+# [Optional] Pretty Colors for Terminal Errors (Bash-specific)
+class colors:
+	green = '\033[92m'
+	blue = '\033[94m'
+	yellow = '\033[93m'
+	red = '\033[91m'
+	bold = '\033[1m'
+	endc = '\033[0m'
+
 # [TEMPORARY HACK] Format labels for use in filenames ([to-fix] - there are better ways to do this)
 def filename_formatter(name):
 	fileName = name.replace(" ", "-")
@@ -124,7 +132,8 @@ def filename_formatter(name):
 # Fetch Geocode
 def get_geocode(address, name, attempt=1, maxAttempts=5):
 	try:
-		location = geolocator.geocode(address)
+		# location = geolocator.geocode(address)
+		location = geocode(address, provider=gcService, api_key=gcKey)
 		return location
 		sleep(1)
 
@@ -201,18 +210,27 @@ def get_data(dfStart, dfEnd, saveJsons="None", saveCSV="None", saveMap="None"):
 	# startLocs = {}
 	# endLocs = {}
 	# colorDict = {}
-	# startLen = 1
-	# endLen = 1
+	startLen = 1
+	endLen = 1
 
 	totalStart = len(dfStart)
 	totalEnd = len(dfEnd)
-	# startFail = 0
-	# endFail = 0
+	startFail = 0
+	endFail = 0
 
 	table = pd.DataFrame(index = dfStart.index)
 
-	dfStart, sData, startFail, startLen = store_geocode(dfStart)
-	dfEnd, eData, endFail, endLen = store_geocode(dfEnd)
+	# dfStart, sData, startFail, startLen = store_geocode(dfStart)
+	# dfEnd, eData, endFail, endLen = store_geocode(dfEnd)
+
+	sGeocodes = geocode(dfStart['address'], provider=gcService, api_key=gcKey)
+	eGeocodes = geocode(dfEnd['address'], provider=gcService, api_key=gcKey)
+
+	sData = dfStart.join(sGeocodes)
+	eData = dfEnd.join(eGeocodes)
+
+	
+
 
 	if startFail > 0 and endFail > 0:
 		print(colors.bold+colors.green+str(totalStart-startFail)+"/"+str(totalStart), "homes &", str(totalEnd-endFail)+"/"+str(totalEnd), "destinations located."+colors.endc)
