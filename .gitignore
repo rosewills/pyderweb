@@ -1,6 +1,7 @@
 # .gitignore for Pyderweb repo
 
 # Rose's test files (should not exist in public Github remote repo)
+gitlist
 rw-*
 rw/*
 test-saves/*

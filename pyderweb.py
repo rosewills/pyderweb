@@ -2,7 +2,7 @@
 '''
 PyderWeb
 
-Version: 0.1.0
+Version: 0.1.1
 Created: 2024-01-19 (by Rose Wills)
 Status: working (needs documentation)
 
@@ -184,8 +184,8 @@ def store_geocode(df):
 # Fetch Route Data
 def get_route(startLoc, endLoc, saveJson="None"):
 	try:
-		startCoorFlip = (startLoc.longitude, startLoc.latitude)
-		endCoorFlip = (endLoc.longitude, endLoc.latitude)
+		startCoorFlip = (startLoc.x, startLoc.y)
+		endCoorFlip = (endLoc.x, endLoc.y)
 
 	except Exception as e:
 		errmess = colors.red+"ERROR [get_route]: unknown error >>>\t"+colors.red+str(e)+colors.endc
@@ -207,9 +207,6 @@ def get_route(startLoc, endLoc, saveJson="None"):
 
 # Generate Results & Save Output Files
 def get_data(dfStart, dfEnd, saveJsons="None", saveCSV="None", saveMap="None"):
-	# startLocs = {}
-	# endLocs = {}
-	# colorDict = {}
 	startLen = 1
 	endLen = 1
 
@@ -220,14 +217,11 @@ def get_data(dfStart, dfEnd, saveJsons="None", saveCSV="None", saveMap="None"):
 
 	table = pd.DataFrame(index = dfStart.index)
 
-	# dfStart, sData, startFail, startLen = store_geocode(dfStart)
-	# dfEnd, eData, endFail, endLen = store_geocode(dfEnd)
-
 	sGeocodes = geocode(dfStart['address'], provider=gcService, api_key=gcKey)
 	eGeocodes = geocode(dfEnd['address'], provider=gcService, api_key=gcKey)
 
-	sData = dfStart.join(sGeocodes)
-	eData = dfEnd.join(eGeocodes)
+	sData = dfStart.join(sGeocodes, rsuffix="_gc")
+	eData = dfEnd.join(eGeocodes, rsuffix="_gc")
 
 	
 
@@ -244,28 +238,25 @@ def get_data(dfStart, dfEnd, saveJsons="None", saveCSV="None", saveMap="None"):
 	else:
 		print(colors.bold+colors.green+"All locations found!"+colors.endc)
 	
-	for endName,info in dfEnd.iterrows():
+	for endName,info in eData.iterrows():
 		cVals = random.choices(range(256), k=3)
 		endColor = "rgb("+str(cVals[0])+","+str(cVals[1])+","+str(cVals[2])+")"
 		print("color for", endName, endColor)
-		dfEnd.at[endName, 'color'] = endColor
+		eData.at[endName, 'color'] = endColor
 	
 	# Output Data Files
-	for start,sInfo in dfStart.iterrows():
+	for start,sInfo in sData.iterrows():
 		print("Generating Route Data for ", start)
 
 		if saveMap != "None":
-			m = folium.Map(location=(sData[start].latitude, sData[start].longitude),zoom_start=7, control_scale=True,tiles="cartodbpositron")
-			# m = folium.Map(location=(sInfo['data'].latitude, sInfo['data'].longitude),zoom_start=7, control_scale=True,tiles="cartodbpositron")
+			m = folium.Map(location=(sData.geometry[start].y, sData.geometry[start].x),zoom_start=7, control_scale=True,tiles="cartodbpositron")
 
-		for end,eInfo in dfEnd.iterrows():
+		for end,eInfo in eData.iterrows():
 			sleep(1)
 			if saveJsons != "None":
 				dataOut = get_route(eData[end], sData[start], saveJson=saveJsons+filename_formatter(start)+"-"+filename_formatter(end))
-				# dataOut = get_route(eInfo['data'], sInfo['data'], saveJson=saveJsons+filename_formatter(start)+"-"+filename_formatter(end))
 			else:
-				dataOut = get_route(eData[end], sData[start])
-				# dataOut = get_route(eInfo['data'], sInfo['data'])
+				dataOut = get_route(eData.geometry[end], sData.geometry[start])
 			try:
 				coors, distance, duration = dataOut
 			except ValueError as e:
@@ -305,7 +296,7 @@ def get_data(dfStart, dfEnd, saveJsons="None", saveCSV="None", saveMap="None"):
 				distancetxt = "<b><strong>"+str(distance)+" miles </strong></b></br>"
 				durationtxt = "<b><strong>"+str(humanTime)+"</strong></b>"
 
-				routeColor = dfEnd.at[end, 'color']
+				routeColor = eData.at[end, 'color']
 				fillColor = routeColor
 				color = routeColor
 
@@ -337,12 +328,8 @@ def get_data(dfStart, dfEnd, saveJsons="None", saveCSV="None", saveMap="None"):
 	print(table)
 
 	if saveCSV != "None":
-		dfStart.to_csv(saveCSV+"-homes.csv")
-		dfEnd.to_csv(saveCSV+"-dests.csv")
-		# csvHomes = dfStart.drop("data", axis=1, inplace=True)
-		# csvDests = dfEnd.drop("data", axis=1, inplace=True)
-		# csvHomes.to_csv(saveCSV+"-homes.csv")
-		# csvDests.to_csv(saveCSV+"-dests.csv")
+		sData.to_csv(saveCSV+"-homes.csv")
+		eData.to_csv(saveCSV+"-dests.csv")
 
 
 # Quickly Get Data for One Home/Destination
@@ -355,7 +342,7 @@ def quick_add(dfAdd, dfExist, type="start", saveJsons="None", saveCSV="None", sa
 		print("Quick_Add() Error: type \""+type+"\" not understood. Please specify type as either \"start\" or \"end\" only.")
 
 
+
+get_data(homes, dests, saveCSV="demo-output/demo", saveMap="demo-output/demo_")
+
 #quick_add(dfQuick, dests, saveCSV="quickTest")
-get_data(homes, dests, saveCSV="demo-output/nomi", saveMap="demo-output/nomi_")
-
-
