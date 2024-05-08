@@ -1,0 +1,4 @@
+service, key
+openrouteservice,INSERT_OPENROUTESERVICE_API_KEY_HERE
+Nominatim,pyderweb
+GoogleV3,INSERT_GOOGLE_MAPS_API_KEY_HERE

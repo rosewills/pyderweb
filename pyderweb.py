@@ -36,6 +36,19 @@ This script is currently a work-in-progress.
 
 '''
 
+# USER SETTINGS #
+#################
+gcService = 'Photon'
+apiCsv    = "rw/rw-apikeys.csv"
+keyCol    = "key"
+
+homesCsv  = "rw/rw-homes.csv"
+destsCsv  = "rw/rw-dests.csv"
+
+outDir    = "rw/updated"
+outCsv   = "updated"
+mapPrefix = "upd_"
+
 # IMPORTS #
 ###########
 # Basic Functions
@@ -60,43 +73,40 @@ from openrouteservice import convert	# decodes route data from openstreetmap for
 
 # GEOCODING & ROUTES #
 ######################
-gcService = 'GoogleV3'
+keys = pd.read_csv(apiCsv,					# csv file listing personal api keys
+				   sep=",",					# character used to delimit columns
+				   quotechar='"',			# character used to quote strings
+				   skipinitialspace=True,	# True if a space is added after each column delimiter
+				   index_col="service")		# Name of column to be used as row labels
 
-keys = pd.read_csv("rw/rw-apikeys.csv",		# csv file listing personal api keys
-					sep=",",				# character used to delimit columns
-					quotechar='"',			# character used to quote strings
-					skipinitialspace=True,	# True if a space is added after each column delimiter
-					index_col="service")	# Name of column to be used as row labels
-keyCol = "key"
+# Geocoder (Open-Source Option) - uses Openstreetmap
+if gcService == 'Nominatim':
+	from geopy.geocoders import Nominatim
+	geolocator = Nominatim(user_agent=keys.at[gcService, keyCol])
+
+# Geocoder (Proprietary Option) - uses Google Maps API
+elif gcService == 'GoogleV3':
+	from geopy.geocoders import GoogleV3
+	geolocator = GoogleV3(api_key=keys.at[gcService, keyCol])
+
 
 gcKey = keys.at[gcService, keyCol]
 
-# client = openrouteservice.Client(key='INSERT_OPENROUTESERVICE_API_KEY_HERE')	# Update key= field with your own Openrouteservice API key
 client = openrouteservice.Client(key=keys.at["openrouteservice", keyCol])	# Update key= field with your own Openrouteservice API key
-																				# Openrouteservice API keys are available (for free!) here: https://openrouteservice.org/plans/
-
-# [NOTE] Choose your preferred Geocoder below (by uncommenting it)
-# from geopy.geocoders import Nominatim			# Geocoder (Open-Source Option) - uses Openstreetmap
-# from geopy.geocoders import GoogleV3			# Geocoder (Proprietary Option) - uses Google Maps API
-
-# [NOTE] Choose the geolocator below that matches your geocoder (remember to update any API key fields to with your own key)
-# geolocator = Nominatim(user_agent="pyderweb")	# user_agent field is arbitrary; can change if you like
-# geolocator = GoogleV3(api_key='INSERT_GOOGLE_MAPS_API_KEY_HERE')	# Update api_key= field with your own Google Maps API key 
-																	# Google Maps API keys are available here: https://developers.google.com/maps
-# geolocator = GoogleV3(api_key=keys.at["GoogleV3", keyCol])
+																			# Openrouteservice API keys are available (for free!) here: https://openrouteservice.org/plans/
 
 
 # INPUT DATA #
 ##############
 # Read in CSV Files
-homes = pd.read_csv("homes-demo.csv",		# csv file listing potential home names & addresses
-					sep=",",				# character used to delimit columns
+homes = pd.read_csv(homesCsv,				# csv file listing potential home names & addresses
+					sep="\t",				# character used to delimit columns
 					quotechar='"',			# character used to quote strings
 					skipinitialspace=True,	# True if a space is added after each column delimiter
 					index_col="name")		# Name of column to be used as row labels
 
-dests = pd.read_csv("dests-demo.csv",		# csv file listing potential destination names & addresses
-					sep=",",				# character used to delimit columns
+dests = pd.read_csv(destsCsv,				# csv file listing potential destination names & addresses
+					sep="\t",				# character used to delimit columns
 					quotechar='"',			# character used to quote strings
 					skipinitialspace=True,	# True if a space is added after each column delimiter
 					index_col="name")		# Name of column to be used as row labels
@@ -132,8 +142,8 @@ def filename_formatter(name):
 # Fetch Geocode
 def get_geocode(address, name, attempt=1, maxAttempts=5):
 	try:
-		# location = geolocator.geocode(address)
-		location = geocode(address, provider=gcService, api_key=gcKey)
+		location = geolocator.geocode(address)
+		#location = geocode(address, provider=gcService, api_key=gcKey)
 		return location
 		sleep(1)
 
@@ -216,14 +226,26 @@ def get_data(dfStart, dfEnd, saveJsons="None", saveCSV="None", saveMap="None"):
 	endFail = 0
 
 	table = pd.DataFrame(index = dfStart.index)
+	
+	if gcService == "Photon":
+		sGeocodes = geocode(dfStart['address'])
+		eGeocodes = geocode(dfEnd['address'])
+	elif gcService == "Nominatim":
+		sGeocodes = geocode(dfStart['address'], provider=gcService, user_agent=gcKey)
+		eGeocodes = geocode(dfEnd['address'], provider=gcService, user_agent=gcKey)
+	else:
+		sGeocodes = geocode(dfStart['address'], provider=gcService, api_key=gcKey)
+		eGeocodes = geocode(dfEnd['address'], provider=gcService, api_key=gcKey)
 
-	sGeocodes = geocode(dfStart['address'], provider=gcService, api_key=gcKey)
-	eGeocodes = geocode(dfEnd['address'], provider=gcService, api_key=gcKey)
+	# sGeocodes = store_geocode(dfStart)
+	# eGeocodes = store_geocode(dfEnd)
+
+	# print(sGeocodes)
 
 	sData = dfStart.join(sGeocodes, rsuffix="_gc")
 	eData = dfEnd.join(eGeocodes, rsuffix="_gc")
 
-	
+	print(sData)
 
 
 	if startFail > 0 and endFail > 0:
@@ -246,10 +268,15 @@ def get_data(dfStart, dfEnd, saveJsons="None", saveCSV="None", saveMap="None"):
 	
 	# Output Data Files
 	for start,sInfo in sData.iterrows():
-		print("Generating Route Data for ", start)
+		try:
+			testpoint = sData.geometry[start].y
+			print("Generating Route Data for ", start)
+		except:
+			print(colors.bold+colors.red+"Could Not Find Route Data for ", start+colors.endc)
+			continue
 
 		if saveMap != "None":
-			m = folium.Map(location=(sData.geometry[start].y, sData.geometry[start].x),zoom_start=7, control_scale=True,tiles="cartodbpositron")
+			m = folium.Map(location=(sData.geometry[start].y, sData.geometry[start].x), zoom_start=7, control_scale=True, tiles="cartodbpositron")
 
 		for end,eInfo in eData.iterrows():
 			sleep(1)
@@ -343,6 +370,6 @@ def quick_add(dfAdd, dfExist, type="start", saveJsons="None", saveCSV="None", sa
 
 
 
-get_data(homes, dests, saveCSV="demo-output/demo", saveMap="demo-output/demo_")
+get_data(homes, dests, saveCSV=outCsv, saveMap=outDir+"/"+mapPrefix)
 
 #quick_add(dfQuick, dests, saveCSV="quickTest")
