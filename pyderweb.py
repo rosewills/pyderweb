@@ -38,7 +38,7 @@ This script is currently a work-in-progress.
 
 # USER SETTINGS #
 #################
-gcService = 'Photon'
+gcService = 'Nominatim'
 apiCsv    = "rw/rw-apikeys.csv"
 keyCol    = "key"
 
@@ -79,15 +79,15 @@ keys = pd.read_csv(apiCsv,					# csv file listing personal api keys
 				   skipinitialspace=True,	# True if a space is added after each column delimiter
 				   index_col="service")		# Name of column to be used as row labels
 
-# Geocoder (Open-Source Option) - uses Openstreetmap
-if gcService == 'Nominatim':
-	from geopy.geocoders import Nominatim
-	geolocator = Nominatim(user_agent=keys.at[gcService, keyCol])
-
 # Geocoder (Proprietary Option) - uses Google Maps API
-elif gcService == 'GoogleV3':
+if gcService == 'GoogleV3':
 	from geopy.geocoders import GoogleV3
 	geolocator = GoogleV3(api_key=keys.at[gcService, keyCol])
+
+# Geocoder (Open-Source Option) - uses Openstreetmap
+elif gcService == 'Nominatim':
+	from geopy.geocoders import Nominatim
+	geolocator = Nominatim(user_agent=keys.at[gcService, keyCol])
 
 
 gcKey = keys.at[gcService, keyCol]
@@ -142,8 +142,8 @@ def filename_formatter(name):
 # Fetch Geocode
 def get_geocode(address, name, attempt=1, maxAttempts=5):
 	try:
-		location = geolocator.geocode(address)
-		#location = geocode(address, provider=gcService, api_key=gcKey)
+		# location = geolocator.geocode(address)
+		location = geocode(address, provider=gcService, user_agent=gcKey)
 		return location
 		sleep(1)
 
@@ -169,6 +169,8 @@ def store_geocode(df):
 	nameLen = 0
 	gcDict = {}
 
+	print(df)
+
 	for name,info in df.iterrows():
 		loc = get_geocode(info["address"],name)
 		try:
@@ -176,6 +178,7 @@ def store_geocode(df):
 				print(colors.red+loc+colors.endc)
 				raise Exception
 			else:
+				print(loc)
 				df.at[name, 'found'] = loc.address
 				gcDict[name] = loc
 				# df.at[name, 'data'] = loc
@@ -226,19 +229,22 @@ def get_data(dfStart, dfEnd, saveJsons="None", saveCSV="None", saveMap="None"):
 	endFail = 0
 
 	table = pd.DataFrame(index = dfStart.index)
-	
-	if gcService == "Photon":
-		sGeocodes = geocode(dfStart['address'])
-		eGeocodes = geocode(dfEnd['address'])
-	elif gcService == "Nominatim":
-		sGeocodes = geocode(dfStart['address'], provider=gcService, user_agent=gcKey)
-		eGeocodes = geocode(dfEnd['address'], provider=gcService, user_agent=gcKey)
-	else:
-		sGeocodes = geocode(dfStart['address'], provider=gcService, api_key=gcKey)
-		eGeocodes = geocode(dfEnd['address'], provider=gcService, api_key=gcKey)
 
-	# sGeocodes = store_geocode(dfStart)
-	# eGeocodes = store_geocode(dfEnd)
+	sGeocodes = store_geocode(dfStart)
+	eGeocodes = store_geocode(dfEnd)
+	
+	# if gcService == "GoogleV3":
+	# 	sGeocodes = geocode(dfStart['address'], provider=gcService, api_key=gcKey)
+	# 	eGeocodes = geocode(dfEnd['address'], provider=gcService, api_key=gcKey)
+	# elif gcService == "Nominatim":
+	# 	sGeocodes = geocode(dfStart['address'], provider=gcService, user_agent=gcKey)
+	# 	eGeocodes = geocode(dfEnd['address'], provider=gcService, user_agent=gcKey)
+	# elif gcService == "Photon":
+	# 	sGeocodes = geocode(dfStart['address'])
+	# 	eGeocodes = geocode(dfEnd['address'])
+	# else:
+	# 	sGeocodes = store_geocode(dfStart)
+	# 	eGeocodes = store_geocode(dfEnd)
 
 	# print(sGeocodes)
 
